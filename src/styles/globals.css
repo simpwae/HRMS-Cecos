@@ -1,0 +1,75 @@
+@import 'tailwindcss';
+
+:root {
+  /* CECOS University Official Brand Colors - Peshawar, Pakistan */
+  --cecos-maroon: 128 0 32; /* Maroon #800020 */
+  --cecos-navy: 0 31 63; /* Navy Blue #001F3F */
+  --cecos-light-maroon: 165 42 42; /* Light Maroon #A52A2A */
+  --cecos-gold: 212 175 55; /* Gold Accent #D4AF37 */
+  --cecos-light: 240 235 235; /* Light Background #F0EBEB */
+
+  --portal-bg: 255 255 255;
+  --portal-accent: 128 0 32;
+}
+
+[data-portal='employee'] {
+  --portal-accent: 0 31 63; /* Navy Blue */
+  --portal-secondary: 128 0 32; /* Maroon */
+}
+
+[data-portal='hr'] {
+  --portal-accent: 128 0 32; /* Maroon */
+  --portal-secondary: 0 31 63; /* Navy Blue */
+}
+
+body {
+  @apply min-h-screen bg-gray-50;
+  font-family:
+    'Inter',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    'Roboto',
+    sans-serif;
+}
+
+/* CECOS Brand Utilities */
+.cecos-primary-bg {
+  background-color: rgb(var(--cecos-primary));
+}
+.cecos-primary-text {
+  color: rgb(var(--cecos-primary));
+}
+.cecos-secondary-bg {
+  background-color: rgb(var(--cecos-secondary));
+}
+.cecos-accent-bg {
+  background-color: rgb(var(--cecos-accent));
+}
+.cecos-accent-text {
+  color: rgb(var(--cecos-accent));
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #800020;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #001f3f;
+}
+
+/* Smooth animations */
+* {
+  @apply transition-colors duration-200;
+}
