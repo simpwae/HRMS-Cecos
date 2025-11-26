@@ -1,0 +1,25 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Redirecting...</title>
+    <meta http-equiv="refresh" content="0;url=/HRMS-Cecos/" />
+    <script>
+      // Single Page App redirect for GitHub Pages
+      (function () {
+        var path = window.location.pathname;
+        var repoBase = '/HRMS-Cecos';
+        // If already at base, load index
+        if (path === repoBase || path === repoBase + '/') {
+          window.location.replace(repoBase + '/');
+          return;
+        }
+        // Redirect any deep link to the SPA index at the base
+        window.location.replace(repoBase + '/');
+      })();
+    </script>
+  </head>
+  <body>
+    Redirecting...
+  </body>
+</html>
