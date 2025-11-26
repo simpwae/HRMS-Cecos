@@ -1,25 +1,40 @@
 <!doctype html>
-<html>
+<html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>Redirecting...</title>
-    <meta http-equiv="refresh" content="0;url=/HRMS-Cecos/" />
-    <script>
-      // Single Page App redirect for GitHub Pages
-      (function () {
-        var path = window.location.pathname;
-        var repoBase = '/HRMS-Cecos';
-        // If already at base, load index
-        if (path === repoBase || path === repoBase + '/') {
-          window.location.replace(repoBase + '/');
-          return;
-        }
-        // Redirect any deep link to the SPA index at the base
-        window.location.replace(repoBase + '/');
-      })();
-    </script>
+    <title>Page Not Found</title>
+    <meta name="robots" content="noindex" />
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        margin: 0;
+      }
+      .wrap {
+        text-align: center;
+        max-width: 480px;
+      }
+      h1 {
+        font-size: 1.5rem;
+        margin-bottom: 0.5rem;
+      }
+      p {
+        color: #555;
+      }
+    </style>
   </head>
   <body>
-    Redirecting...
+    <div class="wrap">
+      <h1>Not Found</h1>
+      <p>
+        This is a static fallback. The SPA handles routing after deployment. If you see this on
+        GitHub Pages, the build artifact may not have copied <code>index.html</code> to
+        <code>404.html</code> correctly.
+      </p>
+      <p><a href="/HRMS-Cecos/">Go to App Root</a></p>
+    </div>
   </body>
 </html>
