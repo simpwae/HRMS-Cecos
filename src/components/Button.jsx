@@ -1,15 +1,31 @@
-export default function Button({ children, variant = 'primary', className = '', ...rest }) {
-  const base =
-    'inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium focus:outline-none focus:ring-2 ring-offset-2 transition shadow-sm';
+export default function Button({
+  children,
+  onClick,
+  variant = 'primary',
+  className = '',
+  type = 'button',
+  disabled = false,
+}) {
+  const baseStyles =
+    'inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95';
+
   const variants = {
-    primary: 'bg-[#800020] text-white hover:bg-[#660019] focus:ring-[#800020]',
-    secondary: 'bg-[#001F3F] text-white hover:bg-[#001530] focus:ring-[#001F3F]',
-    accent: 'bg-[#D4AF37] text-gray-900 hover:bg-[#C09F27] focus:ring-[#D4AF37]',
-    outline: 'border-2 border-[#800020] hover:bg-[#800020]/10 text-[#800020] focus:ring-[#800020]',
-    ghost: 'text-gray-700 hover:bg-gray-100 focus:ring-gray-400',
+    primary:
+      'bg-linear-to-r from-[hsl(var(--color-primary))] to-[hsl(var(--color-secondary))] text-white hover:shadow-lg hover:shadow-[hsl(var(--color-primary)/0.3)] border border-transparent',
+    secondary:
+      'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50 hover:border-gray-300 shadow-xs',
+    outline:
+      'bg-transparent border border-[hsl(var(--color-primary))] text-[hsl(var(--color-primary))] hover:bg-[hsl(var(--color-primary)/0.05)]',
+    danger: 'bg-red-600 text-white hover:bg-red-700 shadow-sm hover:shadow-red-200',
   };
+
   return (
-    <button className={`${base} ${variants[variant]} ${className}`} {...rest}>
+    <button
+      type={type}
+      className={`${baseStyles} ${variants[variant]} ${className}`}
+      onClick={onClick}
+      disabled={disabled}
+    >
       {children}
     </button>
   );

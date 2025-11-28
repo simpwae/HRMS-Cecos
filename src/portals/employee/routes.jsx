@@ -1,22 +1,29 @@
 import React from 'react';
 import { Route } from 'react-router-dom';
-import EmployeeLayout from '../../app/EmployeeLayout';
-import EmployeeLogin from './pages/Login';
+import ProtectedRoute from '../../components/ProtectedRoute';
+import EmployeeLayout from './components/EmployeeLayout';
 import EmployeeDashboard from './pages/Dashboard';
-import Entry from './pages/Entry';
 import Attendance from './pages/Attendance';
 import Leave from './pages/Leave';
 import Salary from './pages/Salary';
+import Profile from './pages/Profile';
 
 export const employeeRoutes = (
-  <>
-    <Route path="/employee/login" element={<EmployeeLogin />} />
-    <Route path="/employee" element={<EmployeeLayout />}>
-      <Route index element={<EmployeeDashboard />} />
-      <Route path="entry" element={<Entry />} />
-      <Route path="attendance" element={<Attendance />} />
-      <Route path="leave" element={<Leave />} />
-      <Route path="salary" element={<Salary />} />
-    </Route>
-  </>
+  <Route
+    path="/employee"
+    element={
+      <ProtectedRoute
+        allowedRoles={['employee', 'hr', 'hod', 'dean', 'vp', 'admin']}
+        redirectTo="/login"
+      >
+        <EmployeeLayout />
+      </ProtectedRoute>
+    }
+  >
+    <Route index element={<EmployeeDashboard />} />
+    <Route path="attendance" element={<Attendance />} />
+    <Route path="leave" element={<Leave />} />
+    <Route path="salary" element={<Salary />} />
+    <Route path="profile" element={<Profile />} />
+  </Route>
 );

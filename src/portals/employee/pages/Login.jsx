@@ -1,61 +1,102 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../../state/auth';
-import Button from '../../../components/Button';
-import Card from '../../../components/Card';
 import CECOSLogo from '../../../components/CECOSLogo';
 
-export default function EmployeeLogin() {
-  const [email, setEmail] = useState('demo@employee.com');
-  const [password, setPassword] = useState('password');
+export default function Login() {
   const navigate = useNavigate();
+  const login = useAuthStore((s) => s.login);
   const switchRole = useAuthStore((s) => s.switchRole);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
 
   const handleLogin = (e) => {
     e.preventDefault();
-    switchRole('employee');
-    navigate('/employee');
+    // Mock login
+    if (email && password) {
+      login({ id: '1', name: 'Demo User', email, role: 'employee' });
+      navigate('/employee');
+    } else {
+      setError('Invalid credentials');
+    }
+  };
+
+  const handleDevLogin = (role) => {
+    switchRole(role);
+    navigate(`/${role}`);
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-red-50 via-white to-amber-50">
-      <Card className="w-full max-w-md">
-        <div className="space-y-6">
-          <div className="text-center">
-            <div className="flex justify-center mb-4">
+    <div className="min-h-screen flex items-center justify-center bg-[url('https://images.unsplash.com/photo-1606761568499-6d2451b23c66?q=80&w=2574&auto=format&fit=crop')] bg-cover bg-center relative">
+      <div className="absolute inset-0 bg-linear-to-br from-[#800020]/90 to-[#001F3F]/90 backdrop-blur-sm" />
+
+      <div className="relative w-full max-w-md p-4 animate-fade-in">
+        <div className="glass p-8 rounded-3xl shadow-2xl border border-white/20">
+          <div className="text-center mb-8">
+            <div className="inline-flex p-4 rounded-full bg-white/10 mb-4 backdrop-blur-md shadow-inner border border-white/10">
               <CECOSLogo variant="icon" size="lg" />
             </div>
-            <h2 className="text-2xl font-bold text-[#800020]">CECOS University</h2>
-            <h3 className="text-lg font-semibold text-gray-900 mt-1">Employee Portal</h3>
-            <p className="mt-2 text-sm text-gray-600">Peshawar, Pakistan</p>
+            <h1 className="text-3xl font-bold text-white tracking-tight">Welcome Back</h1>
+            <p className="text-blue-100 mt-2">Sign in to CECOS HRMS</p>
           </div>
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Email</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#001F3F] focus:ring-[#001F3F]"
-                required
-              />
+
+          <form onSubmit={handleLogin} className="space-y-6">
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-blue-100 mb-1">Email Address</label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/20 text-white placeholder-blue-200/50 focus:outline-none focus:ring-2 focus:ring-white/30 focus:border-white/30 transition-all"
+                  placeholder="admin@cecos.edu.pk"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-blue-100 mb-1">Password</label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/20 text-white placeholder-blue-200/50 focus:outline-none focus:ring-2 focus:ring-white/30 focus:border-white/30 transition-all"
+                  placeholder="••••••••"
+                />
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Password</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#001F3F] focus:ring-[#001F3F]"
-                required
-              />
-            </div>
-            <Button type="submit" variant="primary" className="w-full">
+
+            {error && <p className="text-red-300 text-sm text-center bg-red-500/10 py-2 rounded-lg border border-red-500/20">{error}</p>}
+
+            <button
+              type="submit"
+              className="w-full py-3.5 px-4 rounded-xl bg-white text-[#800020] font-bold text-lg hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-white/50 focus:ring-offset-2 focus:ring-offset-[#800020] transition-all shadow-lg transform active:scale-95"
+            >
               Sign In
-            </Button>
+            </button>
           </form>
+
+          <div className="mt-8 pt-6 border-t border-white/10">
+            <p className="text-xs text-blue-200 text-center mb-4 uppercase tracking-wider font-semibold">Development Access</p>
+            <div className="grid grid-cols-2 gap-3">
+              <button onClick={() => handleDevLogin('hr')} className="px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-white text-xs font-medium border border-white/10 transition-all">
+                HR Portal
+              </button>
+              <button onClick={() => handleDevLogin('vp')} className="px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-white text-xs font-medium border border-white/10 transition-all">
+                VP Portal
+              </button>
+              <button onClick={() => handleDevLogin('dean')} className="px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-white text-xs font-medium border border-white/10 transition-all">
+                Dean Portal
+              </button>
+              <button onClick={() => handleDevLogin('hod')} className="px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-white text-xs font-medium border border-white/10 transition-all">
+                HOD Portal
+              </button>
+            </div>
+          </div>
         </div>
-      </Card>
+        <p className="text-center text-blue-200/60 text-xs mt-6">
+          © {new Date().getFullYear()} CECOS University. All rights reserved.
+        </p>
+      </div>
     </div>
   );
 }
