@@ -13,11 +13,80 @@ import {
   CurrencyDollarIcon,
   ArrowTrendingUpIcon,
   ArrowTrendingDownIcon,
+  FunnelIcon,
+  XMarkIcon,
 } from '@heroicons/react/24/outline';
 
 export default function Reports() {
   const { employees, attendance, leaves } = useDataStore();
   const [selectedMonth, setSelectedMonth] = useState(new Date());
+
+  // Filters
+  const [facultyFilter, setFacultyFilter] = useState('all');
+  const [departmentFilter, setDepartmentFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [designationFilter, setDesignationFilter] = useState('all');
+  const [dateRangeFilter, setDateRangeFilter] = useState('6months');
+
+  // Get available departments based on faculty filter
+  const availableDepartments = useMemo(() => {
+    if (facultyFilter === 'all') {
+      return Object.values(faculties).flat();
+    }
+    return faculties[facultyFilter] || [];
+  }, [facultyFilter]);
+
+  // Get unique designations from employees
+  const availableDesignations = useMemo(() => {
+    const designations = new Set(employees.map((e) => e.designation).filter(Boolean));
+    return Array.from(designations).sort();
+  }, [employees]);
+
+  // Employee status options
+  const statusOptions = ['Active', 'On Leave', 'Resigned'];
+
+  // Filtered employees based on filters
+  const filteredEmployees = useMemo(() => {
+    return employees.filter((emp) => {
+      if (facultyFilter !== 'all' && emp.faculty !== facultyFilter) return false;
+      if (departmentFilter !== 'all' && emp.department !== departmentFilter) return false;
+      if (statusFilter !== 'all' && emp.status !== statusFilter) return false;
+      if (designationFilter !== 'all' && emp.designation !== designationFilter) return false;
+      return true;
+    });
+  }, [employees, facultyFilter, departmentFilter, statusFilter, designationFilter]);
+
+  // Filtered employee IDs for other reports
+  const filteredEmployeeIds = useMemo(() => {
+    return new Set(filteredEmployees.map((e) => e.id));
+  }, [filteredEmployees]);
+
+  // Reset department when faculty changes
+  const handleFacultyChange = (value) => {
+    setFacultyFilter(value);
+    setDepartmentFilter('all');
+  };
+
+  const clearFilters = () => {
+    setFacultyFilter('all');
+    setDepartmentFilter('all');
+    setStatusFilter('all');
+    setDesignationFilter('all');
+    setDateRangeFilter('6months');
+  };
+
+  // Get number of months for date range
+  const getMonthsForRange = () => {
+    const ranges = {
+      '1month': 1,
+      '3months': 3,
+      '6months': 6,
+      '12months': 12,
+    };
+    return ranges[dateRangeFilter] || 6;
+  };
+
+  const hasActiveFilters = facultyFilter !== 'all' || departmentFilter !== 'all' || statusFilter !== 'all' || designationFilter !== 'all' || dateRangeFilter !== '6months';
 
   // Employee stats
   const employeeStats = useMemo(() => {
@@ -25,14 +94,14 @@ export default function Reports() {
     const byFaculty = {};
     const byStatus = { Active: 0, 'On Leave': 0, Resigned: 0 };
 
-    employees.forEach((emp) => {
+    filteredEmployees.forEach((emp) => {
       byDepartment[emp.department] = (byDepartment[emp.department] || 0) + 1;
       byFaculty[emp.faculty] = (byFaculty[emp.faculty] || 0) + 1;
       byStatus[emp.status] = (byStatus[emp.status] || 0) + 1;
     });
 
     return { byDepartment, byFaculty, byStatus };
-  }, [employees]);
+  }, [filteredEmployees]);
 
   // Attendance stats for selected month
   const attendanceStats = useMemo(() => {
@@ -41,7 +110,9 @@ export default function Reports() {
 
     const monthRecords = attendance.filter((a) => {
       const date = parseISO(a.date);
-      return isWithinInterval(date, { start: monthStart, end: monthEnd });
+      const inMonth = isWithinInterval(date, { start: monthStart, end: monthEnd });
+      const isFilteredEmployee = filteredEmployeeIds.has(a.employeeId);
+      return inMonth && isFilteredEmployee;
     });
 
     const present = monthRecords.filter((a) => a.status === 'Present').length;
@@ -59,31 +130,36 @@ export default function Reports() {
     });
 
     return { present, late, absent, total, byEmployee };
-  }, [attendance, selectedMonth]);
+  }, [attendance, selectedMonth, filteredEmployeeIds]);
 
   // Leave stats
   const leaveStats = useMemo(() => {
     const byStatus = { Pending: 0, Approved: 0, Rejected: 0 };
     const byType = {};
 
-    leaves.forEach((leave) => {
+    const filteredLeaves = leaves.filter((l) => filteredEmployeeIds.has(l.employeeId));
+
+    filteredLeaves.forEach((leave) => {
       byStatus[leave.status] = (byStatus[leave.status] || 0) + 1;
       byType[leave.type] = (byType[leave.type] || 0) + 1;
     });
 
-    return { byStatus, byType, total: leaves.length };
-  }, [leaves]);
+    return { byStatus, byType, total: filteredLeaves.length };
+  }, [leaves, filteredEmployeeIds]);
 
   // Monthly trend data
   const monthlyTrend = useMemo(() => {
-    return Array.from({ length: 6 }, (_, i) => {
+    const months = getMonthsForRange();
+    return Array.from({ length: months }, (_, i) => {
       const month = subMonths(new Date(), i);
       const monthStart = startOfMonth(month);
       const monthEnd = endOfMonth(month);
 
       const monthRecords = attendance.filter((a) => {
         const date = parseISO(a.date);
-        return isWithinInterval(date, { start: monthStart, end: monthEnd });
+        const inMonth = isWithinInterval(date, { start: monthStart, end: monthEnd });
+        const isFilteredEmployee = filteredEmployeeIds.has(a.employeeId);
+        return inMonth && isFilteredEmployee;
       });
 
       const present = monthRecords.filter((a) => a.status === 'Present').length;
@@ -100,7 +176,7 @@ export default function Reports() {
           monthRecords.length > 0 ? Math.round(((present + late) / monthRecords.length) * 100) : 0,
       };
     }).reverse();
-  }, [attendance]);
+  }, [attendance, filteredEmployeeIds, dateRangeFilter]);
 
   const formatCurrency = (amount) =>
     new Intl.NumberFormat('en-PK', {
@@ -110,7 +186,7 @@ export default function Reports() {
     }).format(amount);
 
   // Total salary expense
-  const totalSalaryExpense = employees
+  const totalSalaryExpense = filteredEmployees
     .filter((e) => e.status === 'Active')
     .reduce((sum, e) => sum + (e.salaryBase || 0), 0);
 
@@ -120,7 +196,14 @@ export default function Reports() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Reports & Analytics</h1>
-          <p className="text-gray-600">View detailed reports and statistics</p>
+          <p className="text-gray-600">
+            View detailed reports and statistics
+            {hasActiveFilters && (
+              <span className="ml-2 text-indigo-600 font-medium">
+                (Filtered: {filteredEmployees.length} of {employees.length} employees)
+              </span>
+            )}
+          </p>
         </div>
         <Button className="gap-2">
           <DocumentArrowDownIcon className="w-5 h-5" />
@@ -128,13 +211,100 @@ export default function Reports() {
         </Button>
       </div>
 
+      {/* Filters */}
+      <Card className="bg-linear-to-r from-indigo-50 to-purple-50 border-indigo-100">
+        <div className="flex flex-col md:flex-row md:items-center gap-4">
+          <div className="flex items-center gap-2 text-indigo-700">
+            <FunnelIcon className="w-5 h-5" />
+            <span className="font-medium">Filter Reports</span>
+          </div>
+
+          <div className="flex flex-1 flex-wrap items-center gap-3">
+            <select
+              value={facultyFilter}
+              onChange={(e) => handleFacultyChange(e.target.value)}
+              className="px-4 py-2 bg-white border border-indigo-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+              <option value="all">All Faculties</option>
+              {Object.keys(faculties).map((faculty) => (
+                <option key={faculty} value={faculty}>
+                  {faculty}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={departmentFilter}
+              onChange={(e) => setDepartmentFilter(e.target.value)}
+              className="px-4 py-2 bg-white border border-indigo-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+              <option value="all">All Departments</option>
+              {availableDepartments.map((dept) => (
+                <option key={dept} value={dept}>
+                  {dept}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="px-4 py-2 bg-white border border-indigo-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+              <option value="all">All Status</option>
+              {statusOptions.map((status) => (
+                <option key={status} value={status}>
+                  {status}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={designationFilter}
+              onChange={(e) => setDesignationFilter(e.target.value)}
+              className="px-4 py-2 bg-white border border-indigo-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+              <option value="all">All Designations</option>
+              {availableDesignations.map((designation) => (
+                <option key={designation} value={designation}>
+                  {designation}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={dateRangeFilter}
+              onChange={(e) => setDateRangeFilter(e.target.value)}
+              className="px-4 py-2 bg-white border border-indigo-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+              <option value="1month">Last 1 Month</option>
+              <option value="3months">Last 3 Months</option>
+              <option value="6months">Last 6 Months</option>
+              <option value="12months">Last 12 Months</option>
+            </select>
+
+            {hasActiveFilters && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={clearFilters}
+                className="gap-1 text-red-600 border-red-200 hover:bg-red-50"
+              >
+                <XMarkIcon className="w-4 h-4" />
+                Clear Filters
+              </Button>
+            )}
+          </div>
+        </div>
+      </Card>
+
       {/* Summary Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card className="bg-linear-to-br from-blue-50 to-blue-100 border-blue-200">
           <div className="flex items-start justify-between">
             <div>
               <p className="text-sm font-medium text-blue-800">Total Employees</p>
-              <p className="text-3xl font-bold text-blue-900 mt-1">{employees.length}</p>
+              <p className="text-3xl font-bold text-blue-900 mt-1">{filteredEmployees.length}</p>
               <p className="text-xs text-blue-700 mt-1">{employeeStats.byStatus.Active} active</p>
             </div>
             <div className="p-3 bg-blue-500 rounded-lg">
@@ -207,7 +377,9 @@ export default function Reports() {
           <div className="grid lg:grid-cols-2 gap-6">
             {/* Monthly Trend */}
             <Card>
-              <h3 className="font-semibold text-gray-900 mb-4">Attendance Trend (Last 6 Months)</h3>
+              <h3 className="font-semibold text-gray-900 mb-4">
+                Attendance Trend (Last {getMonthsForRange()} {getMonthsForRange() === 1 ? 'Month' : 'Months'})
+              </h3>
               <div className="space-y-4">
                 {monthlyTrend.map((month) => (
                   <div key={month.month}>
@@ -418,7 +590,7 @@ export default function Reports() {
                 </thead>
                 <tbody>
                   {Object.entries(employeeStats.byDepartment).map(([dept, count]) => {
-                    const deptEmployees = employees.filter((e) => e.department === dept);
+                    const deptEmployees = filteredEmployees.filter((e) => e.department === dept);
                     const totalSalary = deptEmployees.reduce(
                       (sum, e) => sum + (e.salaryBase || 0),
                       0,
@@ -440,10 +612,10 @@ export default function Reports() {
                   })}
                   <tr className="bg-gray-50 font-semibold">
                     <td className="py-3 px-4">Total</td>
-                    <td className="py-3 px-4 text-center">{employees.length}</td>
+                    <td className="py-3 px-4 text-center">{filteredEmployees.length}</td>
                     <td className="py-3 px-4 text-right">{formatCurrency(totalSalaryExpense)}</td>
                     <td className="py-3 px-4 text-right">
-                      {formatCurrency(totalSalaryExpense / employees.length)}
+                      {formatCurrency(totalSalaryExpense / (filteredEmployees.length || 1))}
                     </td>
                   </tr>
                 </tbody>

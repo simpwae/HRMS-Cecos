@@ -194,6 +194,20 @@ body {
 }
 
 /* Form input styles */
+input[type='text'],
+input[type='email'],
+input[type='password'],
+input[type='number'],
+input[type='date'],
+input[type='tel'],
+input[type='url'],
+input[type='search'],
+select,
+textarea {
+  @apply w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900 text-sm;
+  @apply bg-white shadow-sm;
+}
+
 input:focus,
 select:focus,
 textarea:focus {

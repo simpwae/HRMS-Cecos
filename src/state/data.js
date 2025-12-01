@@ -32,6 +32,17 @@ export const designations = [
   'HOD',
 ];
 
+// Promotion hierarchy
+export const promotionPath = {
+  'Research Assistant': 'Lecturer',
+  Lecturer: 'Senior Lecturer',
+  'Senior Lecturer': 'Assistant Professor',
+  'Assistant Professor': 'Associate Professor',
+  'Associate Professor': 'Professor',
+  'Lab Engineer': 'Senior Lab Engineer',
+  'Administrative Officer': 'Senior Administrative Officer',
+};
+
 export const leaveTypes = [
   { id: 'annual', name: 'Annual Leave', defaultDays: 20 },
   { id: 'sick', name: 'Sick Leave', defaultDays: 12 },
@@ -40,6 +51,32 @@ export const leaveTypes = [
   { id: 'paternity', name: 'Paternity Leave', defaultDays: 7 },
   { id: 'study', name: 'Study Leave', defaultDays: 30 },
   { id: 'unpaid', name: 'Unpaid Leave', defaultDays: 0 },
+];
+
+// Exit survey questions
+export const exitSurveyQuestions = [
+  {
+    id: 'reason',
+    question: 'Primary reason for leaving',
+    type: 'select',
+    options: [
+      'Better Opportunity',
+      'Personal Reasons',
+      'Relocation',
+      'Health Issues',
+      'Career Change',
+      'Retirement',
+      'Higher Studies',
+      'Other',
+    ],
+  },
+  { id: 'satisfaction', question: 'Overall job satisfaction (1-5)', type: 'rating' },
+  { id: 'management', question: 'Management satisfaction (1-5)', type: 'rating' },
+  { id: 'workEnvironment', question: 'Work environment satisfaction (1-5)', type: 'rating' },
+  { id: 'growth', question: 'Career growth opportunities (1-5)', type: 'rating' },
+  { id: 'wouldRecommend', question: 'Would you recommend CECOS to others?', type: 'boolean' },
+  { id: 'wouldReturn', question: 'Would you consider returning in the future?', type: 'boolean' },
+  { id: 'feedback', question: 'Additional feedback or suggestions', type: 'textarea' },
 ];
 
 // Initial mock data
@@ -292,6 +329,125 @@ const initialNotifications = [
   },
 ];
 
+// Initial promotions data
+const initialPromotions = [
+  {
+    id: 'pr1',
+    employeeId: 'e1',
+    employeeName: 'Alice Smith',
+    department: 'CS',
+    faculty: 'Computing',
+    currentDesignation: 'Senior Lecturer',
+    requestedDesignation: 'Assistant Professor',
+    reason: 'Completed PhD and published 5 research papers in reputed journals',
+    yearsInService: 3,
+    status: 'Pending',
+    appliedOn: format(subDays(today, 10), 'yyyy-MM-dd'),
+    documents: ['PhD Certificate', 'Research Publications'],
+    committeeReview: null,
+    hrDecision: null,
+  },
+];
+
+// Initial resignations data
+const initialResignations = [
+  {
+    id: 'res1',
+    employeeId: 'e6',
+    employeeName: 'Sample Employee',
+    department: 'Physics',
+    faculty: 'Sciences',
+    designation: 'Lecturer',
+    reason: 'Pursuing higher studies abroad',
+    noticePeriod: 30,
+    lastWorkingDate: format(addDays(today, 30), 'yyyy-MM-dd'),
+    status: 'Pending',
+    appliedOn: format(subDays(today, 5), 'yyyy-MM-dd'),
+    exitSurvey: null,
+    hrApproval: null,
+    handoverStatus: 'pending',
+  },
+];
+
+// Alumni/Former employees
+const initialAlumni = [
+  {
+    id: 'alum1',
+    employeeId: 'ex-e10',
+    name: 'Dr. Rashid Khan',
+    email: 'rashid.khan@gmail.com',
+    department: 'EE',
+    faculty: 'Engineering',
+    designation: 'Associate Professor',
+    joinDate: '2015-06-01',
+    exitDate: format(subDays(today, 180), 'yyyy-MM-dd'),
+    yearsOfService: 8,
+    exitReason: 'Better Opportunity',
+    exitSurvey: {
+      reason: 'Better Opportunity',
+      satisfaction: 4,
+      management: 3,
+      workEnvironment: 4,
+      growth: 3,
+      wouldRecommend: true,
+      wouldReturn: true,
+      feedback: 'Great institution, wonderful colleagues. Left for a senior position abroad.',
+    },
+  },
+  {
+    id: 'alum2',
+    employeeId: 'ex-e11',
+    name: 'Prof. Amina Bibi',
+    email: 'amina.bibi@outlook.com',
+    department: 'Chemistry',
+    faculty: 'Sciences',
+    designation: 'Professor',
+    joinDate: '2010-03-15',
+    exitDate: format(subDays(today, 365), 'yyyy-MM-dd'),
+    yearsOfService: 14,
+    exitReason: 'Retirement',
+    exitSurvey: {
+      reason: 'Retirement',
+      satisfaction: 5,
+      management: 5,
+      workEnvironment: 5,
+      growth: 4,
+      wouldRecommend: true,
+      wouldReturn: false,
+      feedback: 'Wonderful career at CECOS. Will cherish the memories forever.',
+    },
+  },
+];
+
+// Announcements
+const initialAnnouncements = [
+  {
+    id: 'ann1',
+    title: 'Eid Holidays Schedule',
+    message:
+      'CECOS University will remain closed from June 28 to July 3 for Eid ul Adha. Wishing everyone a blessed Eid!',
+    priority: 'high',
+    targetAudience: 'all',
+    createdBy: 'HR Department',
+    createdAt: format(subDays(today, 2), 'yyyy-MM-dd HH:mm'),
+    expiresAt: format(addDays(today, 10), 'yyyy-MM-dd'),
+    isActive: true,
+  },
+  {
+    id: 'ann2',
+    title: 'Faculty Meeting Notice',
+    message:
+      'All faculty members are requested to attend the quarterly meeting on Friday at 2:00 PM in the main auditorium.',
+    priority: 'medium',
+    targetAudience: 'faculty',
+    department: null,
+    createdBy: 'HR Department',
+    createdAt: format(subDays(today, 1), 'yyyy-MM-dd HH:mm'),
+    expiresAt: format(addDays(today, 5), 'yyyy-MM-dd'),
+    isActive: true,
+  },
+];
+
 export const useDataStore = create(
   persist(
     (set, get) => ({
@@ -299,6 +455,10 @@ export const useDataStore = create(
       attendance: generateAttendance(),
       leaves: initialLeaves,
       notifications: initialNotifications,
+      promotions: initialPromotions,
+      resignations: initialResignations,
+      alumni: initialAlumni,
+      announcements: initialAnnouncements,
 
       // Employee actions
       addEmployee: (emp) =>
@@ -309,6 +469,7 @@ export const useDataStore = create(
               ...emp,
               id: generateId('e'),
               code: `EMP${String(s.employees.length + 1).padStart(3, '0')}`,
+              status: 'Active',
               leaveBalance: { annual: 20, sick: 12, casual: 10 },
             },
           ],
@@ -493,6 +654,204 @@ export const useDataStore = create(
         get().notifications.filter((n) => !n.read && (n.userId === userId || n.userId === 'all'))
           .length,
 
+      // ============ PROMOTION ACTIONS ============
+      addPromotion: (promotion) => {
+        const employee = get().getEmployee(promotion.employeeId);
+        set((s) => ({
+          promotions: [
+            ...s.promotions,
+            {
+              ...promotion,
+              id: generateId('pr'),
+              employeeName: employee?.name,
+              department: employee?.department,
+              faculty: employee?.faculty,
+              currentDesignation: employee?.designation,
+              status: 'Pending',
+              appliedOn: format(new Date(), 'yyyy-MM-dd'),
+              committeeReview: null,
+              hrDecision: null,
+            },
+          ],
+        }));
+      },
+
+      updatePromotionStatus: (id, status, decision) =>
+        set((s) => ({
+          promotions: s.promotions.map((p) =>
+            p.id === id
+              ? {
+                  ...p,
+                  status,
+                  ...(decision.type === 'committee' && { committeeReview: decision }),
+                  ...(decision.type === 'hr' && { hrDecision: decision }),
+                }
+              : p,
+          ),
+        })),
+
+      approvePromotion: (id) => {
+        const promotion = get().promotions.find((p) => p.id === id);
+        if (promotion) {
+          // Update employee designation
+          set((s) => ({
+            employees: s.employees.map((e) =>
+              e.id === promotion.employeeId
+                ? { ...e, designation: promotion.requestedDesignation }
+                : e,
+            ),
+            promotions: s.promotions.map((p) =>
+              p.id === id
+                ? { ...p, status: 'Approved', approvedOn: format(new Date(), 'yyyy-MM-dd') }
+                : p,
+            ),
+          }));
+        }
+      },
+
+      getPromotionsByEmployee: (employeeId) =>
+        get().promotions.filter((p) => p.employeeId === employeeId),
+
+      getPendingPromotions: () =>
+        get().promotions.filter((p) => p.status === 'Pending' || p.status === 'Under Review'),
+
+      // ============ RESIGNATION ACTIONS ============
+      addResignation: (resignation) => {
+        const employee = get().getEmployee(resignation.employeeId);
+        set((s) => ({
+          resignations: [
+            ...s.resignations,
+            {
+              ...resignation,
+              id: generateId('res'),
+              employeeName: employee?.name,
+              department: employee?.department,
+              faculty: employee?.faculty,
+              designation: employee?.designation,
+              status: 'Pending',
+              appliedOn: format(new Date(), 'yyyy-MM-dd'),
+              exitSurvey: null,
+              hrApproval: null,
+              handoverStatus: 'pending',
+            },
+          ],
+        }));
+      },
+
+      updateResignationStatus: (id, status, updates = {}) =>
+        set((s) => ({
+          resignations: s.resignations.map((r) => (r.id === id ? { ...r, status, ...updates } : r)),
+        })),
+
+      submitExitSurvey: (resignationId, survey) =>
+        set((s) => ({
+          resignations: s.resignations.map((r) =>
+            r.id === resignationId
+              ? { ...r, exitSurvey: survey, exitSurveyDate: format(new Date(), 'yyyy-MM-dd') }
+              : r,
+          ),
+        })),
+
+      processResignation: (id) => {
+        const resignation = get().resignations.find((r) => r.id === id);
+        if (resignation) {
+          const employee = get().getEmployee(resignation.employeeId);
+          if (employee) {
+            // Move to alumni
+            set((s) => ({
+              alumni: [
+                ...s.alumni,
+                {
+                  id: generateId('alum'),
+                  employeeId: employee.id,
+                  name: employee.name,
+                  email: employee.email,
+                  department: employee.department,
+                  faculty: employee.faculty,
+                  designation: employee.designation,
+                  joinDate: employee.joinDate,
+                  exitDate: resignation.lastWorkingDate,
+                  yearsOfService: Math.floor(
+                    (new Date(resignation.lastWorkingDate) - new Date(employee.joinDate)) /
+                      (365.25 * 24 * 60 * 60 * 1000),
+                  ),
+                  exitReason: resignation.reason,
+                  exitSurvey: resignation.exitSurvey,
+                },
+              ],
+              employees: s.employees.filter((e) => e.id !== resignation.employeeId),
+              resignations: s.resignations.map((r) =>
+                r.id === id
+                  ? { ...r, status: 'Completed', processedOn: format(new Date(), 'yyyy-MM-dd') }
+                  : r,
+              ),
+            }));
+          }
+        }
+      },
+
+      getResignationsByEmployee: (employeeId) =>
+        get().resignations.filter((r) => r.employeeId === employeeId),
+
+      getPendingResignations: () =>
+        get().resignations.filter((r) => r.status === 'Pending' || r.status === 'Approved'),
+
+      // ============ ALUMNI ACTIONS ============
+      getAlumniByDepartment: (dept) => get().alumni.filter((a) => a.department === dept),
+
+      getAlumniByFaculty: (faculty) => get().alumni.filter((a) => a.faculty === faculty),
+
+      searchAlumni: (query) => {
+        const q = query.toLowerCase();
+        return get().alumni.filter(
+          (a) =>
+            a.name.toLowerCase().includes(q) ||
+            a.department.toLowerCase().includes(q) ||
+            a.designation.toLowerCase().includes(q),
+        );
+      },
+
+      // ============ ANNOUNCEMENT ACTIONS ============
+      addAnnouncement: (announcement) =>
+        set((s) => ({
+          announcements: [
+            {
+              ...announcement,
+              id: generateId('ann'),
+              createdAt: format(new Date(), 'yyyy-MM-dd HH:mm'),
+              isActive: true,
+            },
+            ...s.announcements,
+          ],
+        })),
+
+      updateAnnouncement: (id, updates) =>
+        set((s) => ({
+          announcements: s.announcements.map((a) => (a.id === id ? { ...a, ...updates } : a)),
+        })),
+
+      deleteAnnouncement: (id) =>
+        set((s) => ({
+          announcements: s.announcements.filter((a) => a.id !== id),
+        })),
+
+      getActiveAnnouncements: () => {
+        const now = new Date();
+        return get().announcements.filter(
+          (a) => a.isActive && (!a.expiresAt || new Date(a.expiresAt) > now),
+        );
+      },
+
+      getAnnouncementsForUser: (user) => {
+        const active = get().getActiveAnnouncements();
+        return active.filter((a) => {
+          if (a.targetAudience === 'all') return true;
+          if (a.targetAudience === 'faculty' && user?.faculty) return true;
+          if (a.department && a.department === user?.department) return true;
+          return false;
+        });
+      },
+
       // Stats and analytics
       getStats: () => {
         const state = get();
@@ -506,8 +865,11 @@ export const useDataStore = create(
           lateToday: todayAttendance.filter((a) => a.status === 'Late').length,
           absentToday: state.employees.length - todayAttendance.length,
           pendingLeaves: state.leaves.filter((l) => l.status === 'Pending').length,
+          pendingPromotions: state.promotions.filter((p) => p.status === 'Pending').length,
+          pendingResignations: state.resignations.filter((r) => r.status === 'Pending').length,
           onLeave: state.employees.filter((e) => e.status === 'On Leave').length,
           totalPayroll: state.employees.reduce((sum, e) => sum + e.salaryBase, 0),
+          totalAlumni: state.alumni.length,
         };
       },
 
@@ -518,6 +880,10 @@ export const useDataStore = create(
           attendance: generateAttendance(),
           leaves: initialLeaves,
           notifications: initialNotifications,
+          promotions: initialPromotions,
+          resignations: initialResignations,
+          alumni: initialAlumni,
+          announcements: initialAnnouncements,
         }),
     }),
     {
@@ -527,6 +893,10 @@ export const useDataStore = create(
         attendance: state.attendance,
         leaves: state.leaves,
         notifications: state.notifications,
+        promotions: state.promotions,
+        resignations: state.resignations,
+        alumni: state.alumni,
+        announcements: state.announcements,
       }),
     },
   ),
