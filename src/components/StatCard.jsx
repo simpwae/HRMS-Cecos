@@ -8,7 +8,9 @@ import { ArrowUpIcon, ArrowDownIcon } from '@heroicons/react/24/solid';
  * @param {string} subtitle - Additional context
  * @param {React.Component} icon - Heroicon component
  * @param {string} iconBg - Background color class for icon
+ * @param {string} color - Color theme: 'primary', 'success', 'warning', 'danger', 'default'
  * @param {number} trend - Percentage change (positive/negative)
+ * @param {string} trendValue - Custom trend display value
  * @param {string} trendLabel - Label for trend (e.g., "vs last month")
  * @param {Function} onClick - Click handler
  */
@@ -17,27 +19,42 @@ export default function StatCard({
   value,
   subtitle,
   icon: Icon,
-  iconBg = 'bg-blue-500',
+  iconBg,
+  color = 'default',
   trend,
+  trendValue,
   trendLabel = 'vs last month',
   onClick,
   className = '',
 }) {
-  const isPositiveTrend = trend > 0;
-  const hasTrend = trend !== undefined && trend !== null;
+  const colorStyles = {
+    primary: 'bg-[hsl(var(--color-primary))]',
+    success: 'bg-green-500',
+    warning: 'bg-amber-500',
+    danger: 'bg-red-500',
+    default: 'bg-blue-500',
+    info: 'bg-blue-500',
+  };
+
+  const isPositiveTrend = trend > 0 || (trendValue && trendValue.startsWith('+'));
+  const hasTrend = trend !== undefined || trendValue;
+
+  const iconBackground = iconBg || colorStyles[color] || colorStyles.default;
 
   return (
     <div
-      className={`glass rounded-2xl p-6 card-hover ${onClick ? 'cursor-pointer' : ''} ${className}`}
+      className={`glass rounded-2xl p-4 sm:p-6 card-hover ${onClick ? 'cursor-pointer' : ''} ${className}`}
       onClick={onClick}
     >
-      <div className="flex items-start justify-between">
-        <div className="flex-1">
-          <p className="text-sm font-medium text-gray-500 mb-1">{title}</p>
-          <p className="text-3xl font-bold text-gray-900 tracking-tight">{value}</p>
-          {subtitle && <p className="text-sm text-gray-500 mt-1">{subtitle}</p>}
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex-1 min-w-0">
+          <p className="text-xs sm:text-sm font-medium text-gray-500 mb-1 truncate">{title}</p>
+          <p className="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight truncate">
+            {value}
+          </p>
+          {subtitle && <p className="text-xs sm:text-sm text-gray-500 mt-1 truncate">{subtitle}</p>}
           {hasTrend && (
-            <div className="flex items-center gap-1 mt-3">
+            <div className="flex items-center gap-1 mt-2 sm:mt-3 flex-wrap">
               <span
                 className={`inline-flex items-center gap-0.5 text-xs font-medium px-2 py-0.5 rounded-full ${
                   isPositiveTrend ? 'text-green-700 bg-green-100' : 'text-red-700 bg-red-100'
@@ -48,15 +65,15 @@ export default function StatCard({
                 ) : (
                   <ArrowDownIcon className="w-3 h-3" />
                 )}
-                {Math.abs(trend)}%
+                {trendValue || `${Math.abs(trend)}%`}
               </span>
               <span className="text-xs text-gray-400">{trendLabel}</span>
             </div>
           )}
         </div>
         {Icon && (
-          <div className={`p-3 rounded-xl ${iconBg} text-white shadow-lg`}>
-            <Icon className="w-6 h-6" />
+          <div className={`p-2 sm:p-3 rounded-xl ${iconBackground} text-white shadow-lg shrink-0`}>
+            <Icon className="w-5 h-5 sm:w-6 sm:h-6" />
           </div>
         )}
       </div>

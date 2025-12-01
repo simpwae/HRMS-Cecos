@@ -86,7 +86,12 @@ export default function Reports() {
     return ranges[dateRangeFilter] || 6;
   };
 
-  const hasActiveFilters = facultyFilter !== 'all' || departmentFilter !== 'all' || statusFilter !== 'all' || designationFilter !== 'all' || dateRangeFilter !== '6months';
+  const hasActiveFilters =
+    facultyFilter !== 'all' ||
+    departmentFilter !== 'all' ||
+    statusFilter !== 'all' ||
+    designationFilter !== 'all' ||
+    dateRangeFilter !== '6months';
 
   // Employee stats
   const employeeStats = useMemo(() => {
@@ -213,17 +218,17 @@ export default function Reports() {
 
       {/* Filters */}
       <Card className="bg-linear-to-r from-indigo-50 to-purple-50 border-indigo-100">
-        <div className="flex flex-col md:flex-row md:items-center gap-4">
+        <div className="flex flex-col gap-4">
           <div className="flex items-center gap-2 text-indigo-700">
             <FunnelIcon className="w-5 h-5" />
             <span className="font-medium">Filter Reports</span>
           </div>
 
-          <div className="flex flex-1 flex-wrap items-center gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             <select
               value={facultyFilter}
               onChange={(e) => handleFacultyChange(e.target.value)}
-              className="px-4 py-2 bg-white border border-indigo-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="px-3 py-2 bg-white border border-indigo-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
             >
               <option value="all">All Faculties</option>
               {Object.keys(faculties).map((faculty) => (
@@ -236,7 +241,7 @@ export default function Reports() {
             <select
               value={departmentFilter}
               onChange={(e) => setDepartmentFilter(e.target.value)}
-              className="px-4 py-2 bg-white border border-indigo-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="px-3 py-2 bg-white border border-indigo-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
             >
               <option value="all">All Departments</option>
               {availableDepartments.map((dept) => (
@@ -249,7 +254,7 @@ export default function Reports() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-4 py-2 bg-white border border-indigo-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="px-3 py-2 bg-white border border-indigo-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
             >
               <option value="all">All Status</option>
               {statusOptions.map((status) => (
@@ -262,7 +267,7 @@ export default function Reports() {
             <select
               value={designationFilter}
               onChange={(e) => setDesignationFilter(e.target.value)}
-              className="px-4 py-2 bg-white border border-indigo-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="px-3 py-2 bg-white border border-indigo-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
             >
               <option value="all">All Designations</option>
               {availableDesignations.map((designation) => (
@@ -275,7 +280,7 @@ export default function Reports() {
             <select
               value={dateRangeFilter}
               onChange={(e) => setDateRangeFilter(e.target.value)}
-              className="px-4 py-2 bg-white border border-indigo-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="px-3 py-2 bg-white border border-indigo-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
             >
               <option value="1month">Last 1 Month</option>
               <option value="3months">Last 3 Months</option>
@@ -291,7 +296,7 @@ export default function Reports() {
                 className="gap-1 text-red-600 border-red-200 hover:bg-red-50"
               >
                 <XMarkIcon className="w-4 h-4" />
-                Clear Filters
+                Clear
               </Button>
             )}
           </div>
@@ -378,7 +383,8 @@ export default function Reports() {
             {/* Monthly Trend */}
             <Card>
               <h3 className="font-semibold text-gray-900 mb-4">
-                Attendance Trend (Last {getMonthsForRange()} {getMonthsForRange() === 1 ? 'Month' : 'Months'})
+                Attendance Trend (Last {getMonthsForRange()}{' '}
+                {getMonthsForRange() === 1 ? 'Month' : 'Months'})
               </h3>
               <div className="space-y-4">
                 {monthlyTrend.map((month) => (

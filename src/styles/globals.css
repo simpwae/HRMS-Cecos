@@ -78,6 +78,15 @@ body {
     padding-bottom: env(safe-area-inset-bottom, 0);
   }
 
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
   .gradient-text {
     @apply bg-clip-text text-transparent bg-linear-to-r from-[hsl(var(--color-primary))] to-[hsl(var(--color-secondary))];
   }
