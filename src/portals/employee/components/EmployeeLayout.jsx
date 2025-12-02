@@ -6,6 +6,7 @@ import {
   UserCircleIcon,
   ArrowTrendingUpIcon,
   ArrowRightOnRectangleIcon,
+  ShieldCheckIcon,
 } from '@heroicons/react/24/outline';
 import PortalLayout from '../../../app/PortalLayout';
 
@@ -16,6 +17,7 @@ const navItems = [
   { path: '/employee/salary', label: 'Salary', icon: BanknotesIcon },
   { path: '/employee/promotions', label: 'Promotions', icon: ArrowTrendingUpIcon },
   { path: '/employee/resignation', label: 'Resignation', icon: ArrowRightOnRectangleIcon },
+  { path: '/employee/policy-advisory', label: 'Policy Advisory', icon: ShieldCheckIcon },
   { path: '/employee/profile', label: 'Profile', icon: UserCircleIcon },
 ];
 

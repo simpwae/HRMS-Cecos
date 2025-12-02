@@ -13,6 +13,7 @@ import Promotions from './pages/Promotions';
 import Resignations from './pages/Resignations';
 import Alumni from './pages/Alumni';
 import Analytics from './pages/Analytics';
+import PolicyAdvisory from './pages/PolicyAdvisory';
 
 export const hrRoutes = (
   <Route
@@ -32,6 +33,7 @@ export const hrRoutes = (
     <Route path="alumni" element={<Alumni />} />
     <Route path="analytics" element={<Analytics />} />
     <Route path="reports" element={<Reports />} />
+    <Route path="policy-advisory" element={<PolicyAdvisory />} />
     <Route path="announcements" element={<Announcements />} />
     <Route path="settings" element={<Settings />} />
   </Route>

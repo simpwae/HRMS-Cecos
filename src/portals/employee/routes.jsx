@@ -9,6 +9,7 @@ import Salary from './pages/Salary';
 import Profile from './pages/Profile';
 import Promotions from './pages/Promotions';
 import Resignation from './pages/Resignation';
+import PolicyAdvisory from './pages/PolicyAdvisory';
 
 export const employeeRoutes = (
   <Route
@@ -29,5 +30,6 @@ export const employeeRoutes = (
     <Route path="profile" element={<Profile />} />
     <Route path="promotions" element={<Promotions />} />
     <Route path="resignation" element={<Resignation />} />
+    <Route path="policy-advisory" element={<PolicyAdvisory />} />
   </Route>
 );

@@ -2,24 +2,16 @@ import { useState, useMemo } from 'react';
 import { format, parseISO, subMonths, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
 import { useDataStore, faculties } from '../../../state/data';
 import Card from '../../../components/Card';
-import Button from '../../../components/Button';
-import Badge from '../../../components/Badge';
 import {
   UsersIcon,
   UserPlusIcon,
   UserMinusIcon,
   ArrowTrendingUpIcon,
-  ArrowTrendingDownIcon,
-  ChartBarIcon,
-  CalendarDaysIcon,
-  BuildingOfficeIcon,
-  AcademicCapIcon,
+  ArrowTrendingDownIcon
 } from '@heroicons/react/24/outline';
 import {
   BarChart,
   Bar,
-  LineChart,
-  Line,
   PieChart,
   Pie,
   Cell,

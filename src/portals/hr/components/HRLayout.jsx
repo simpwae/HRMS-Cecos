@@ -11,6 +11,7 @@ import {
   ArrowRightOnRectangleIcon,
   AcademicCapIcon,
   ChartPieIcon,
+  ShieldCheckIcon,
 } from '@heroicons/react/24/outline';
 
 const navItems = [
@@ -23,6 +24,7 @@ const navItems = [
   { path: '/hr/alumni', label: 'Alumni', icon: AcademicCapIcon },
   { path: '/hr/analytics', label: 'Analytics', icon: ChartPieIcon },
   { path: '/hr/reports', label: 'Reports', icon: ChartBarIcon },
+  { path: '/hr/policy-advisory', label: 'Policy Advisory', icon: ShieldCheckIcon },
   { path: '/hr/announcements', label: 'Announcements', icon: BellIcon },
   { path: '/hr/settings', label: 'Settings', icon: Cog6ToothIcon },
 ];
