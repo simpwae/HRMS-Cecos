@@ -3,6 +3,16 @@ import { persist } from 'zustand/middleware';
 
 // Demo users for different roles
 const demoUsers = {
+  finance: {
+    id: 'u-finance',
+    name: 'Finance Officer',
+    email: 'finance@cecos.edu.pk',
+    avatar: null,
+    roles: ['finance'],
+    primaryRole: 'finance',
+    department: 'Finance',
+    faculty: 'Administration',
+  },
   admin: {
     id: 'u-admin',
     name: 'System Administrator',
@@ -23,14 +33,14 @@ const demoUsers = {
     department: 'Human Resources',
     faculty: 'Administration',
   },
-  vp: {
-    id: 'u-vp',
-    name: 'Dr. Ahmad Malik',
-    email: 'vp@cecos.edu.pk',
+  president: {
+    id: 'u-president',
+    name: 'University President',
+    email: 'president@cecos.edu.pk',
     avatar: null,
-    roles: ['vp', 'employee'],
-    primaryRole: 'vp',
-    department: 'Executive',
+    roles: ['president', 'employee'],
+    primaryRole: 'president',
+    department: 'Executive Office',
     faculty: null,
   },
   dean: {
@@ -70,17 +80,29 @@ const demoUsers = {
     name: 'Demo User',
     email: 'demo@cecos.edu.pk',
     avatar: null,
-    roles: ['employee', 'hr', 'vp', 'dean', 'hod', 'admin'],
+    roles: ['employee', 'hr', 'president', 'dean', 'hod', 'admin'],
     primaryRole: 'employee',
     department: 'CS',
     faculty: 'Computing',
+  },
+  vc: {
+    id: 'u-vc',
+    name: 'Vice Chancellor',
+    email: 'vc@cecos.edu.pk',
+    password: 'password',
+    avatar: null,
+    roles: ['vc', 'employee'],
+    primaryRole: 'vc',
+    department: 'Executive Office',
+    faculty: null,
   },
 };
 
 // Role hierarchy for permission checking
 const roleHierarchy = {
   admin: 100,
-  vp: 90,
+  president: 95,
+  vc: 85,
   dean: 70,
   hod: 60,
   hr: 50,
@@ -90,17 +112,20 @@ const roleHierarchy = {
 // Portal routes for each role
 export const portalRoutes = {
   admin: '/admin',
-  vp: '/vp',
+  president: '/president',
+  vc: '/vc',
   dean: '/dean',
   hod: '/hod',
   hr: '/hr',
   employee: '/employee',
+  finance: '/finance/dashboard',
 };
 
 // Role display names
 export const roleNames = {
   admin: 'Administrator',
-  vp: 'Vice President',
+  president: 'President',
+  vc: 'Vice Chancellor',
   dean: 'Dean',
   hod: 'Head of Department',
   hr: 'HR Manager',
@@ -152,6 +177,8 @@ export const useAuthStore = create(
           activeRole: role,
           isAuthenticated: true,
         });
+        // Directly route finance to dashboard, not login
+        if (role === 'finance') return '/finance/dashboard';
         return portalRoutes[role] || '/employee';
       },
 

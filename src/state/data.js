@@ -1,11 +1,99 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { format, subDays, addDays } from 'date-fns';
+import { format, subDays, addDays, differenceInDays, parseISO } from 'date-fns';
 
 const today = new Date();
 
 // Helper to generate IDs
 const generateId = (prefix) => `${prefix}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+// ============ MATERNITY LEAVE VALIDATION FUNCTIONS ============
+
+/**
+ * Calculate probation end date given join date
+ * @param {string} joinDate - Join date in 'yyyy-MM-dd' format
+ * @param {number} probationMonths - Duration of probation in months (default: 6)
+ * @returns {string} Probation end date in 'yyyy-MM-dd' format
+ */
+export const calculateProbationEndDate = (joinDate, probationMonths = 6) => {
+  const joinDateObj = parseISO(joinDate);
+  const endDate = addDays(joinDateObj, probationMonths * 30);
+  return format(endDate, 'yyyy-MM-dd');
+};
+
+/**
+ * Validate maternity leave eligibility based on employee status
+ * @param {Object} employee - Employee object with gender and employmentStatus
+ * @returns {Object} { eligible: boolean, reason: string }
+ */
+export const validateMaternityEligibility = (employee) => {
+  if (!employee) {
+    return { eligible: false, reason: 'Employee not found' };
+  }
+
+  // Check 1: Gender must be female
+  if (employee.gender?.toLowerCase() !== 'female') {
+    return { eligible: false, reason: 'Maternity leave is only available for female employees' };
+  }
+
+  // Check 2: Employment status must be confirmed
+  if (employee.employmentStatus === 'probation') {
+    const probationEndDate = employee.probationEndDate;
+    if (probationEndDate) {
+      return {
+        eligible: false,
+        reason: `You are currently on probation. Maternity leave will be available after probation ends on ${format(parseISO(probationEndDate), 'MMM d, yyyy')}`,
+      };
+    }
+    return {
+      eligible: false,
+      reason:
+        'Maternity leave is not available during probation period. Only confirmed employees can apply.',
+    };
+  }
+
+  return { eligible: true, reason: 'Employee is eligible for maternity leave' };
+};
+
+/**
+ * Validate maternity leave advance notice requirement (2 months = 60 days)
+ * @param {string} expectedDeliveryDate - Expected delivery date in 'yyyy-MM-dd' format
+ * @param {string} applicationDate - Application date in 'yyyy-MM-dd' format (default: today)
+ * @returns {Object} { valid: boolean, daysInAdvance: number, minRequired: number }
+ */
+export const validateAdvanceNotice = (
+  expectedDeliveryDate,
+  applicationDate = format(today, 'yyyy-MM-dd'),
+) => {
+  const MIN_DAYS_ADVANCE = 60; // 2 months
+
+  if (!expectedDeliveryDate) {
+    return {
+      valid: false,
+      daysInAdvance: 0,
+      minRequired: MIN_DAYS_ADVANCE,
+      reason: 'Expected delivery date is required for maternity leave application',
+    };
+  }
+
+  const daysInAdvance = differenceInDays(parseISO(expectedDeliveryDate), parseISO(applicationDate));
+
+  if (daysInAdvance < MIN_DAYS_ADVANCE) {
+    return {
+      valid: false,
+      daysInAdvance,
+      minRequired: MIN_DAYS_ADVANCE,
+      reason: `Maternity leave requires at least ${MIN_DAYS_ADVANCE} days advance notice. You have only ${daysInAdvance} days.`,
+    };
+  }
+
+  return {
+    valid: true,
+    daysInAdvance,
+    minRequired: MIN_DAYS_ADVANCE,
+    reason: `Valid application with ${daysInAdvance} days advance notice`,
+  };
+};
 
 // Faculties and Departments structure
 export const faculties = {
@@ -43,14 +131,28 @@ export const promotionPath = {
   'Administrative Officer': 'Senior Administrative Officer',
 };
 
+// Leave types with medical leave configuration
 export const leaveTypes = [
-  { id: 'annual', name: 'Annual Leave', defaultDays: 20 },
-  { id: 'sick', name: 'Sick Leave', defaultDays: 12 },
-  { id: 'casual', name: 'Casual Leave', defaultDays: 10 },
-  { id: 'maternity', name: 'Maternity Leave', defaultDays: 90 },
-  { id: 'paternity', name: 'Paternity Leave', defaultDays: 7 },
-  { id: 'study', name: 'Study Leave', defaultDays: 30 },
-  { id: 'unpaid', name: 'Unpaid Leave', defaultDays: 0 },
+  { id: 'annual', name: 'Annual Leave', days: 30, color: 'blue' },
+  { id: 'sick', name: 'Sick Leave', days: 10, color: 'red' }, // keep, but lower
+  { id: 'casual', name: 'Casual Leave', days: 10, color: 'purple' },
+  {
+    id: 'maternity',
+    name: 'Maternity Leave',
+    days: 90,
+    color: 'pink',
+    requiresDocuments: false,
+    genderRestriction: 'female',
+  },
+  {
+    id: 'medical',
+    name: 'Medical Leave',
+    days: 30, // increased allowance to prevent blocking
+    color: 'teal',
+    requiresDocuments: true,
+    approvalFlow: ['hod', 'vc', 'president'],
+  },
+  { id: 'unpaid', name: 'Unpaid Leave', days: 0, color: 'gray' },
 ];
 
 // Exit survey questions
@@ -87,17 +189,22 @@ const initialEmployees = [
     name: 'Alice Smith',
     email: 'alice@cecos.edu.pk',
     phone: '+92-321-1234567',
+    gender: 'female',
     department: 'CS',
     faculty: 'Computing',
     designation: 'Senior Lecturer',
     joinDate: '2022-06-01',
+    employmentStatus: 'confirmed',
     status: 'Active',
     salaryBase: 120000,
     bankAccount: 'HBL-123456789',
     cnic: '17301-1234567-1',
     address: '123 University Road, Peshawar',
     emergencyContact: '+92-321-9876543',
-    leaveBalance: { annual: 18, sick: 10, casual: 8 },
+    leaveBalance: { annual: 18, sick: 8, casual: 8, medical: 30 }, // added medical, aligned with allowance
+    dependents: [],
+    qualifications: [],
+    publications: [],
   },
   {
     id: 'e2',
@@ -105,94 +212,121 @@ const initialEmployees = [
     name: 'Bob Ahmed',
     email: 'bob@cecos.edu.pk',
     phone: '+92-333-2345678',
+    gender: 'male',
     department: 'HRM',
     faculty: 'Management',
     designation: 'HR Manager',
     joinDate: '2021-07-15',
+    employmentStatus: 'confirmed',
     status: 'Active',
     salaryBase: 150000,
     bankAccount: 'MCB-987654321',
     cnic: '17301-2345678-2',
     address: '456 Hayatabad, Peshawar',
     emergencyContact: '+92-333-8765432',
-    leaveBalance: { annual: 20, sick: 12, casual: 10 },
+    leaveBalance: { annual: 20, sick: 10, casual: 10, medical: 30 },
+    dependents: [],
+    qualifications: [],
+    publications: [],
   },
   {
     id: 'e3',
     code: 'EMP003',
-    name: 'Dr. Charlie Brown',
-    email: 'charlie@cecos.edu.pk',
-    phone: '+92-345-3456789',
-    department: 'AI',
-    faculty: 'Computing',
+    name: 'Dr. Diana Prince',
+    email: 'diana@cecos.edu.pk',
+    phone: '+92-300-3456789',
+    gender: 'female',
+    department: 'BBA',
+    faculty: 'Management',
     designation: 'Associate Professor',
     joinDate: '2020-08-01',
+    employmentStatus: 'confirmed',
     status: 'Active',
     salaryBase: 200000,
     bankAccount: 'UBL-456789123',
     cnic: '17301-3456789-3',
-    address: '789 DHA, Peshawar',
-    emergencyContact: '+92-345-7654321',
-    leaveBalance: { annual: 15, sick: 8, casual: 6 },
+    address: '789 University Town, Peshawar',
+    emergencyContact: '+92-300-9876543',
+    leaveBalance: { annual: 15, sick: 8, casual: 5, medical: 30 },
+    dependents: [],
+    qualifications: [],
+    publications: [],
   },
   {
     id: 'e4',
     code: 'EMP004',
-    name: 'Dr. Diana Prince',
-    email: 'diana@cecos.edu.pk',
+    name: 'Prof. Rashid Ali',
+    email: 'rashid@cecos.edu.pk',
     phone: '+92-311-4567890',
-    department: 'BBA',
-    faculty: 'Management',
+    gender: 'male',
+    department: 'CS',
+    faculty: 'Computing',
     designation: 'Professor',
     joinDate: '2019-01-10',
-    status: 'On Leave',
+    employmentStatus: 'confirmed',
+    status: 'Active',
     salaryBase: 250000,
-    bankAccount: 'ABL-789123456',
+    bankAccount: 'ABL-321654987',
     cnic: '17301-4567890-4',
     address: '101 Saddar, Peshawar',
     emergencyContact: '+92-311-6543210',
-    leaveBalance: { annual: 5, sick: 12, casual: 4 },
+    leaveBalance: { annual: 5, sick: 12, casual: 4, medical: 30 },
+    dependents: [],
+    qualifications: [],
+    publications: [],
   },
   {
     id: 'e5',
     code: 'EMP005',
     name: 'Eng. Faraz Khan',
     email: 'faraz@cecos.edu.pk',
-    phone: '+92-300-5678901',
+    phone: '+92-322-5678901',
+    gender: 'male',
     department: 'EE',
     faculty: 'Engineering',
     designation: 'Lab Engineer',
     joinDate: '2023-03-15',
+    employmentStatus: 'probation',
+    probationEndDate: '2023-09-15',
     status: 'Active',
     salaryBase: 80000,
-    bankAccount: 'HBL-321654987',
+    bankAccount: 'HBL-789456123',
     cnic: '17301-5678901-5',
-    address: '202 University Town, Peshawar',
+    address: '202 Cantt, Peshawar',
     emergencyContact: '+92-300-1098765',
-    leaveBalance: { annual: 20, sick: 12, casual: 10 },
+    leaveBalance: { annual: 20, sick: 12, casual: 10, medical: 30 },
+    dependents: [],
+    qualifications: [],
+    publications: [],
   },
   {
     id: 'e6',
     code: 'EMP006',
     name: 'Sana Malik',
     email: 'sana@cecos.edu.pk',
-    phone: '+92-322-6789012',
+    phone: '+92-333-6789012',
+    gender: 'female',
     department: 'Physics',
     faculty: 'Sciences',
     designation: 'Lecturer',
     joinDate: '2024-01-20',
+    employmentStatus: 'probation',
+    probationEndDate: '2024-07-20',
     status: 'Active',
     salaryBase: 90000,
     bankAccount: 'MCB-654987321',
     cnic: '17301-6789012-6',
     address: '303 Cantt, Peshawar',
     emergencyContact: '+92-322-2109876',
-    leaveBalance: { annual: 20, sick: 12, casual: 10 },
+    leaveBalance: { annual: 20, sick: 12, casual: 10, medical: 30 },
+    dependents: [],
+    qualifications: [],
+    publications: [],
   },
 ];
 
 // Generate attendance for past 30 days
-const generateAttendance = () => {
+function generateAttendance() {
   const records = [];
   const statuses = ['Present', 'Present', 'Present', 'Late', 'Absent'];
 
@@ -205,29 +339,25 @@ const generateAttendance = () => {
       if (dayOfWeek === 0 || dayOfWeek === 6) continue;
 
       const status = statuses[Math.floor(Math.random() * statuses.length)];
-      const clockIn =
-        status === 'Absent'
-          ? null
-          : status === 'Late'
-            ? `09:${15 + Math.floor(Math.random() * 30)}`
-            : `08:${45 + Math.floor(Math.random() * 15)}`;
-      const clockOut = status === 'Absent' ? null : `17:${Math.floor(Math.random() * 30)}`;
+      const clockIn = status === 'Absent' ? null : `08:${15 + Math.floor(Math.random() * 30)}`;
+      const clockOut = status === 'Absent' ? null : `17:${45 + Math.floor(Math.random() * 15)}`;
 
       records.push({
-        id: generateId('att'),
+        id: `att-${emp.id}-${date}`,
         employeeId: emp.id,
         date,
         clockIn,
         clockOut,
         status,
-        workHours: clockIn && clockOut ? 8 + Math.random() : 0,
+        workHours: status === 'Absent' ? 0 : 8 + Math.random(),
       });
     }
   });
 
   return records;
-};
+}
 
+// Initial leaves data
 const initialLeaves = [
   {
     id: 'l1',
@@ -236,84 +366,126 @@ const initialLeaves = [
     department: 'CS',
     faculty: 'Computing',
     type: 'annual',
-    startDate: format(addDays(today, 5), 'yyyy-MM-dd'),
-    endDate: format(addDays(today, 7), 'yyyy-MM-dd'),
+    startDate: format(subDays(today, 5), 'yyyy-MM-dd'),
+    endDate: format(subDays(today, 3), 'yyyy-MM-dd'),
     days: 3,
     reason: 'Family vacation',
-    status: 'Pending',
-    appliedOn: format(subDays(today, 2), 'yyyy-MM-dd'),
+    status: 'Approved',
+    appliedOn: format(subDays(today, 10), 'yyyy-MM-dd'),
+    reviewedBy: 'Dr. HOD',
+    reviewedOn: format(subDays(today, 8), 'yyyy-MM-dd'),
+    paidDays: null,
+    unpaidDays: null,
+    leaveCategory: null,
     approvalChain: [
-      { role: 'hod', status: 'pending', by: null, date: null },
-      { role: 'dean', status: 'pending', by: null, date: null },
-      { role: 'hr', status: 'pending', by: null, date: null },
+      {
+        role: 'hod',
+        status: 'approved',
+        by: 'Dr. HOD',
+        date: format(subDays(today, 8), 'yyyy-MM-dd'),
+        comment: null,
+      },
+      {
+        role: 'dean',
+        status: 'approved',
+        by: 'Prof. Dean',
+        date: format(subDays(today, 7), 'yyyy-MM-dd'),
+        comment: null,
+      },
+      {
+        role: 'hr',
+        status: 'approved',
+        by: 'HR Manager',
+        date: format(subDays(today, 6), 'yyyy-MM-dd'),
+        comment: null,
+      },
     ],
   },
   {
     id: 'l2',
-    employeeId: 'e4',
+    employeeId: 'e3',
     employeeName: 'Dr. Diana Prince',
     department: 'BBA',
     faculty: 'Management',
-    type: 'sick',
-    startDate: format(subDays(today, 10), 'yyyy-MM-dd'),
-    endDate: format(subDays(today, 5), 'yyyy-MM-dd'),
+    type: 'medical',
+    startDate: format(subDays(today, 12), 'yyyy-MM-dd'),
+    endDate: format(subDays(today, 8), 'yyyy-MM-dd'),
     days: 5,
     reason: 'Medical procedure',
     status: 'Approved',
     appliedOn: format(subDays(today, 15), 'yyyy-MM-dd'),
+    reviewedBy: 'President',
+    reviewedOn: format(subDays(today, 5), 'yyyy-MM-dd'),
+    paidDays: 3,
+    unpaidDays: 2,
+    leaveCategory: 'medical',
+    documents: [
+      {
+        id: 'doc1',
+        name: 'Medical Certificate.pdf',
+        file: '/mock/medical-cert.pdf',
+        size: 125000,
+        uploadedAt: format(subDays(today, 15), 'yyyy-MM-dd'),
+      },
+    ],
     approvalChain: [
       {
         role: 'hod',
         status: 'approved',
         by: 'Dr. HOD',
         date: format(subDays(today, 14), 'yyyy-MM-dd'),
+        comment: 'Medical documents verified',
       },
       {
-        role: 'dean',
+        role: 'vc',
         status: 'approved',
-        by: 'Dean',
-        date: format(subDays(today, 13), 'yyyy-MM-dd'),
+        by: 'Vice Chancellor',
+        date: format(subDays(today, 10), 'yyyy-MM-dd'),
+        comment: 'Recommended for approval',
       },
       {
-        role: 'hr',
+        role: 'president',
         status: 'approved',
-        by: 'HR Manager',
-        date: format(subDays(today, 12), 'yyyy-MM-dd'),
+        by: 'President',
+        date: format(subDays(today, 5), 'yyyy-MM-dd'),
+        comment: 'Approved',
+        paidDays: 3,
+        unpaidDays: 2,
+        leaveCategory: 'medical',
       },
     ],
   },
   {
     id: 'l3',
-    employeeId: 'e3',
-    employeeName: 'Dr. Charlie Brown',
-    department: 'AI',
+    employeeId: 'e4',
+    employeeName: 'Prof. Rashid Ali',
+    department: 'CS',
     faculty: 'Computing',
-    type: 'study',
-    startDate: format(addDays(today, 15), 'yyyy-MM-dd'),
-    endDate: format(addDays(today, 25), 'yyyy-MM-dd'),
-    days: 10,
-    reason: 'International conference presentation',
-    status: 'Forwarded',
+    type: 'sick',
+    startDate: format(subDays(today, 4), 'yyyy-MM-dd'),
+    endDate: format(subDays(today, 2), 'yyyy-MM-dd'),
+    days: 3,
+    reason: 'Flu',
+    status: 'Pending',
     appliedOn: format(subDays(today, 5), 'yyyy-MM-dd'),
+    paidDays: null,
+    unpaidDays: null,
+    leaveCategory: null,
     approvalChain: [
-      {
-        role: 'hod',
-        status: 'approved',
-        by: 'Dr. HOD',
-        date: format(subDays(today, 4), 'yyyy-MM-dd'),
-      },
-      { role: 'dean', status: 'pending', by: null, date: null },
-      { role: 'hr', status: 'pending', by: null, date: null },
+      { role: 'hod', status: 'pending', by: null, date: null, comment: null },
+      { role: 'dean', status: 'pending', by: null, date: null, comment: null },
+      { role: 'hr', status: 'pending', by: null, date: null, comment: null },
     ],
   },
 ];
 
+// Initial notifications
 const initialNotifications = [
   {
     id: 'n1',
     userId: 'all',
     title: 'System Maintenance',
-    message: 'HRMS will be under maintenance on Saturday 10 PM - 2 AM',
+    message: 'The HR system will be under maintenance on Saturday 10 PM - 2 AM',
     type: 'info',
     read: false,
     createdAt: format(subDays(today, 1), 'yyyy-MM-dd HH:mm'),
@@ -321,7 +493,7 @@ const initialNotifications = [
   {
     id: 'n2',
     userId: 'e1',
-    title: 'Leave Request Update',
+    title: 'Leave Approved',
     message: 'Your leave request has been forwarded to Dean',
     type: 'success',
     read: false,
@@ -329,7 +501,7 @@ const initialNotifications = [
   },
 ];
 
-// Initial promotions data
+// Initial promotions
 const initialPromotions = [
   {
     id: 'pr1',
@@ -339,27 +511,26 @@ const initialPromotions = [
     faculty: 'Computing',
     currentDesignation: 'Senior Lecturer',
     requestedDesignation: 'Assistant Professor',
-    reason: 'Completed PhD and published 5 research papers in reputed journals',
-    yearsInService: 3,
+    justification: 'Completed PhD and published 5 research papers in reputed journals',
     status: 'Pending',
     appliedOn: format(subDays(today, 10), 'yyyy-MM-dd'),
-    documents: ['PhD Certificate', 'Research Publications'],
+    supportingDocuments: ['PhD Certificate', 'Research Publications'],
     committeeReview: null,
     hrDecision: null,
   },
 ];
 
-// Initial resignations data
+// Initial resignations
 const initialResignations = [
   {
     id: 'res1',
     employeeId: 'e6',
-    employeeName: 'Sample Employee',
+    employeeName: 'Sana Malik',
     department: 'Physics',
     faculty: 'Sciences',
     designation: 'Lecturer',
-    reason: 'Pursuing higher studies abroad',
-    noticePeriod: 30,
+    reason: 'Higher studies abroad',
+    noticePeriod: 60,
     lastWorkingDate: format(addDays(today, 30), 'yyyy-MM-dd'),
     status: 'Pending',
     appliedOn: format(subDays(today, 5), 'yyyy-MM-dd'),
@@ -369,8 +540,8 @@ const initialResignations = [
   },
 ];
 
-// Alumni/Former employees
-const initialAlumni = [
+// Initial ex-employees
+const initialExEmployees = [
   {
     id: 'alum1',
     employeeId: 'ex-e10',
@@ -386,7 +557,7 @@ const initialAlumni = [
     exitSurvey: {
       reason: 'Better Opportunity',
       satisfaction: 4,
-      management: 3,
+      management: 4,
       workEnvironment: 4,
       growth: 3,
       wouldRecommend: true,
@@ -457,12 +628,18 @@ export const useDataStore = create(
       notifications: initialNotifications,
       promotions: initialPromotions,
       resignations: initialResignations,
-      alumni: initialAlumni,
+      exEmployees: initialExEmployees,
       announcements: initialAnnouncements,
 
       // Employee actions
-      addEmployee: (emp) =>
-        set((s) => ({
+      addEmployee: (emp) => {
+        // Calculate probation end date if employee is on probation
+        const probationEndDate =
+          emp.employmentStatus === 'probation' && emp.joinDate
+            ? calculateProbationEndDate(emp.joinDate)
+            : null;
+
+        return set((s) => ({
           employees: [
             ...s.employees,
             {
@@ -470,10 +647,14 @@ export const useDataStore = create(
               id: generateId('e'),
               code: `EMP${String(s.employees.length + 1).padStart(3, '0')}`,
               status: 'Active',
-              leaveBalance: { annual: 20, sick: 12, casual: 10 },
+              leaveBalance: { annual: 20, sick: 12, casual: 10, medical: 30 },
+              probationEndDate,
+              gender: emp.gender || 'male',
+              employmentStatus: emp.employmentStatus || 'confirmed',
             },
           ],
-        })),
+        }));
+      },
 
       updateEmployee: (id, updates) =>
         set((s) => ({
@@ -552,71 +733,163 @@ export const useDataStore = create(
               faculty: employee?.faculty,
               status: 'Pending',
               appliedOn: format(today, 'yyyy-MM-dd'),
-              approvalChain: [
-                { role: 'hod', status: 'pending', by: null, date: null },
-                { role: 'dean', status: 'pending', by: null, date: null },
-                { role: 'hr', status: 'pending', by: null, date: null },
-              ],
+              paidDays: leave.paidDays ?? null,
+              unpaidDays: leave.unpaidDays ?? null,
+              leaveCategory: leave.leaveCategory ?? null,
+              approvalChain:
+                leave.type === 'medical'
+                  ? [
+                      { role: 'hod', status: 'pending', by: null, date: null, comment: null },
+                      { role: 'vc', status: 'pending', by: null, date: null, comment: null },
+                      {
+                        role: 'president',
+                        status: 'pending',
+                        by: null,
+                        date: null,
+                        comment: null,
+                        paidDays: null,
+                        unpaidDays: null,
+                        leaveCategory: null,
+                      },
+                    ]
+                  : [
+                      { role: 'hod', status: 'pending', by: null, date: null, comment: null },
+                      { role: 'dean', status: 'pending', by: null, date: null, comment: null },
+                      { role: 'hr', status: 'pending', by: null, date: null, comment: null },
+                    ],
             },
           ],
         }));
       },
 
-      updateLeaveStatus: (id, status, approverRole, approverName) => {
-        set((s) => ({
-          leaves: s.leaves.map((l) => {
-            if (l.id !== id) return l;
+      updateLeaveStatus: (
+        leaveId,
+        newStatus,
+        approverRole,
+        approverName,
+        comments = '',
+        metadata = {},
+      ) => {
+        set((state) => {
+          const normalizedRole = approverRole;
+          const leaves = state.leaves.map((leave) => {
+            if (leave.id !== leaveId) return leave;
 
-            const newApprovalChain = l.approvalChain.map((step) => {
-              if (step.role === approverRole) {
-                return {
-                  ...step,
-                  status:
-                    status === 'Approved'
-                      ? 'approved'
-                      : status === 'Rejected'
-                        ? 'rejected'
-                        : 'pending',
-                  by: approverName,
-                  date: format(today, 'yyyy-MM-dd'),
-                };
+            const now = new Date().toISOString();
+            let updatedLeave = { ...leave };
+
+            // Initialize approval chain based on leave type
+            if (!updatedLeave.approvalChain) {
+              if (leave.type === 'medical') {
+                // Medical leave: HOD → VC → President
+                updatedLeave.approvalChain = [
+                  { role: 'hod', status: 'pending', by: null, date: null, comment: null },
+                  { role: 'vc', status: 'pending', by: null, date: null, comment: null },
+                  {
+                    role: 'president',
+                    status: 'pending',
+                    by: null,
+                    date: null,
+                    comment: null,
+                    paidDays: null,
+                    unpaidDays: null,
+                    leaveCategory: null,
+                  },
+                ];
+              } else {
+                // Other leaves: HOD → Dean → HR
+                updatedLeave.approvalChain = [
+                  { role: 'hod', status: 'pending', by: null, date: null, comment: null },
+                  {
+                    role: 'dean',
+                    status: 'pending',
+                    by: null,
+                    date: null,
+                    comment: null,
+                    paidDays: null,
+                    unpaidDays: null,
+                  },
+                  { role: 'hr', status: 'pending', by: null, date: null, comment: null },
+                ];
               }
-              return step;
-            });
-
-            // Determine overall status
-            let newStatus = status;
-            if (status === 'Approved') {
-              const nextPending = newApprovalChain.find((s) => s.status === 'pending');
-              newStatus = nextPending ? 'Forwarded' : 'Approved';
             }
 
-            return {
-              ...l,
-              status: newStatus,
-              approvalChain: newApprovalChain,
-            };
-          }),
-        }));
+            // Find current step
+            const currentStepIndex = updatedLeave.approvalChain.findIndex(
+              (step) => step.role === normalizedRole,
+            );
 
-        // Deduct leave balance if approved
-        if (status === 'Approved') {
-          const leave = get().leaves.find((l) => l.id === id);
-          if (leave) {
-            set((s) => ({
-              employees: s.employees.map((e) => {
-                if (e.id !== leave.employeeId) return e;
-                return {
-                  ...e,
-                  leaveBalance: {
-                    ...e.leaveBalance,
-                    [leave.type]: Math.max(0, (e.leaveBalance[leave.type] || 0) - leave.days),
-                  },
-                };
-              }),
-            }));
-          }
-        }
+            if (currentStepIndex === -1) return leave;
+
+            // Update current step
+            updatedLeave.approvalChain[currentStepIndex] = {
+              ...updatedLeave.approvalChain[currentStepIndex],
+              status: newStatus.toLowerCase(),
+              by: approverName,
+              date: now,
+              comment: comments || null,
+            };
+
+            // President's paid/unpaid split and categorization for medical leave
+            if (
+              leave.type === 'medical' &&
+              normalizedRole === 'president' &&
+              newStatus === 'Approved'
+            ) {
+              if (metadata.paidDays !== undefined) {
+                updatedLeave.approvalChain[currentStepIndex].paidDays = metadata.paidDays;
+                updatedLeave.approvalChain[currentStepIndex].unpaidDays = metadata.unpaidDays;
+                updatedLeave.paidDays = metadata.paidDays;
+                updatedLeave.unpaidDays = metadata.unpaidDays;
+              }
+              if (metadata.leaveCategory) {
+                updatedLeave.approvalChain[currentStepIndex].leaveCategory = metadata.leaveCategory;
+                updatedLeave.leaveCategory = metadata.leaveCategory;
+              }
+            }
+
+            // Dean's paid/unpaid split for non-medical leaves
+            if (approverRole === 'dean' && metadata.paidDays !== undefined) {
+              updatedLeave.approvalChain[currentStepIndex].paidDays = metadata.paidDays;
+              updatedLeave.approvalChain[currentStepIndex].unpaidDays = metadata.unpaidDays;
+              updatedLeave.paidDays = metadata.paidDays;
+              updatedLeave.unpaidDays = metadata.unpaidDays;
+            }
+
+            // HR's medical categorization for non-medical flow
+            if (approverRole === 'hr' && metadata.leaveCategory) {
+              updatedLeave.leaveCategory = metadata.leaveCategory;
+            }
+
+            if (newStatus === 'Rejected') {
+              updatedLeave.status = 'Rejected';
+              updatedLeave.reviewedBy = approverName;
+              updatedLeave.reviewedOn = now;
+              updatedLeave.comments = comments;
+            } else if (newStatus === 'Approved') {
+              const nextPendingStep = updatedLeave.approvalChain.find(
+                (step, idx) => idx > currentStepIndex && step.status === 'pending',
+              );
+
+              if (nextPendingStep) {
+                updatedLeave.status = 'Forwarded';
+                updatedLeave.currentApprover = nextPendingStep.role;
+              } else {
+                updatedLeave.status = 'Approved';
+                updatedLeave.reviewedBy = approverName;
+                updatedLeave.reviewedOn = now;
+              }
+
+              if (comments) {
+                updatedLeave.comments = comments;
+              }
+            }
+
+            return updatedLeave;
+          });
+
+          return { leaves };
+        });
       },
 
       getLeavesByEmployee: (employeeId) => get().leaves.filter((l) => l.employeeId === employeeId),
@@ -693,7 +966,6 @@ export const useDataStore = create(
       approvePromotion: (id) => {
         const promotion = get().promotions.find((p) => p.id === id);
         if (promotion) {
-          // Update employee designation
           set((s) => ({
             employees: s.employees.map((e) =>
               e.id === promotion.employeeId
@@ -757,10 +1029,10 @@ export const useDataStore = create(
         if (resignation) {
           const employee = get().getEmployee(resignation.employeeId);
           if (employee) {
-            // Move to alumni
+            // Move to ex-employees
             set((s) => ({
-              alumni: [
-                ...s.alumni,
+              exEmployees: [
+                ...s.exEmployees,
                 {
                   id: generateId('alum'),
                   employeeId: employee.id,
@@ -796,14 +1068,14 @@ export const useDataStore = create(
       getPendingResignations: () =>
         get().resignations.filter((r) => r.status === 'Pending' || r.status === 'Approved'),
 
-      // ============ ALUMNI ACTIONS ============
-      getAlumniByDepartment: (dept) => get().alumni.filter((a) => a.department === dept),
+      // ============ EX-EMPLOYEES ACTIONS ============
+      getExEmployeesByDepartment: (dept) => get().exEmployees.filter((a) => a.department === dept),
 
-      getAlumniByFaculty: (faculty) => get().alumni.filter((a) => a.faculty === faculty),
+      getExEmployeesByFaculty: (faculty) => get().exEmployees.filter((a) => a.faculty === faculty),
 
-      searchAlumni: (query) => {
+      searchExEmployees: (query) => {
         const q = query.toLowerCase();
-        return get().alumni.filter(
+        return get().exEmployees.filter(
           (a) =>
             a.name.toLowerCase().includes(q) ||
             a.department.toLowerCase().includes(q) ||
@@ -869,7 +1141,7 @@ export const useDataStore = create(
           pendingResignations: state.resignations.filter((r) => r.status === 'Pending').length,
           onLeave: state.employees.filter((e) => e.status === 'On Leave').length,
           totalPayroll: state.employees.reduce((sum, e) => sum + e.salaryBase, 0),
-          totalAlumni: state.alumni.length,
+          totalExEmployees: state.exEmployees.length,
         };
       },
 
@@ -882,7 +1154,7 @@ export const useDataStore = create(
           notifications: initialNotifications,
           promotions: initialPromotions,
           resignations: initialResignations,
-          alumni: initialAlumni,
+          exEmployees: initialExEmployees,
           announcements: initialAnnouncements,
         }),
     }),
@@ -895,9 +1167,278 @@ export const useDataStore = create(
         notifications: state.notifications,
         promotions: state.promotions,
         resignations: state.resignations,
-        alumni: state.alumni,
+        exEmployees: state.exEmployees,
         announcements: state.announcements,
       }),
     },
   ),
 );
+
+// ============ EMAIL SERVICE FUNCTIONS ============
+
+const WEB3FORMS_ACCESS_KEY = '18a0400c-1b05-4bbb-a7f9-8ba08012816e';
+const API_ENDPOINT = 'https://api.web3forms.com/submit';
+
+export const sendEmail = async (emailData) => {
+  try {
+    const formData = new FormData();
+    formData.append('access_key', WEB3FORMS_ACCESS_KEY);
+    formData.append('to_email', emailData.to);
+    formData.append('subject', emailData.subject);
+    formData.append('message', emailData.message);
+    formData.append('from_name', emailData.from_name || 'HRMS System');
+
+    const response = await fetch(API_ENDPOINT, {
+      method: 'POST',
+      body: formData,
+    });
+
+    const result = await response.json();
+    return result;
+  } catch (error) {
+    console.error('Email sending failed:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+export const sendLeaveNotification = async (leaveData, currentUserEmail) => {
+  // Get all employees from the store
+  const store = useDataStore.getState();
+  const allEmployees = store.employees || [];
+
+  // Get all employee emails, excluding the current user
+  const recipients = allEmployees
+    .filter((emp) => emp.email && emp.email !== currentUserEmail)
+    .map((emp) => emp.email);
+
+  // If no recipients, log and return
+  if (recipients.length === 0) {
+    console.log('No recipients found for leave notification');
+    return null;
+  }
+
+  const emailMessage = `Dear Colleague,
+
+A new leave request has been submitted:
+
+Employee Name: ${leaveData.employeeName}
+Leave Type: ${leaveData.leaveType.charAt(0).toUpperCase() + leaveData.leaveType.slice(1)}
+Start Date: ${leaveData.startDate}
+End Date: ${leaveData.endDate}
+Duration: ${leaveData.days} day(s)
+Reason: ${leaveData.reason}
+Status: ${leaveData.status}
+
+Please review and process this leave request through the HRMS dashboard.
+
+Best regards,
+HRMS System
+CECOS University`;
+
+  const emailPromises = recipients.map((email) =>
+    sendEmail({
+      to: email,
+      subject: `New Leave Request - ${leaveData.employeeName} (${leaveData.leaveType})`,
+      message: emailMessage,
+      from_name: 'HRMS Leave Management',
+    }),
+  );
+
+  try {
+    const results = await Promise.all(emailPromises);
+    console.log(
+      `Leave notification emails sent successfully to ${recipients.length} recipients`,
+      results,
+    );
+    return results;
+  } catch (error) {
+    console.error('Leave notification emails failed:', error);
+    return null;
+  }
+};
+
+export const sendNewEmployeeNotification = async (employeeData, currentUserEmail) => {
+  // Get all employees from the store
+  const store = useDataStore.getState();
+  const allEmployees = store.employees || [];
+
+  // Get all employee emails, excluding the current user and new employee
+  const recipients = allEmployees
+    .filter(
+      (emp) => emp.email && emp.email !== currentUserEmail && emp.email !== employeeData.email,
+    )
+    .map((emp) => emp.email);
+
+  const emailMessage = `Dear Team,
+
+A new employee has been added to the system:
+
+Employee Name: ${employeeData.name}
+Employee Code: ${employeeData.code}
+Email: ${employeeData.email}
+Designation: ${employeeData.designation}
+Department: ${employeeData.department}
+Join Date: ${employeeData.joinDate}
+
+Please update your records accordingly.
+
+Best regards,
+HRMS System
+CECOS University`;
+
+  const emailPromises = recipients.map((email) =>
+    sendEmail({
+      to: email,
+      subject: `New Employee Added - ${employeeData.name}`,
+      message: emailMessage,
+      from_name: 'HRMS Employee Management',
+    }),
+  );
+
+  try {
+    const results = await Promise.all(emailPromises);
+
+    // Welcome email to new employee
+    await sendEmail({
+      to: employeeData.email,
+      subject: 'Welcome to CECOS University - Your Employee Account',
+      message: `Dear ${employeeData.name},
+
+Welcome to CECOS University!
+
+Your employee account has been created in the HRMS.
+
+Your Employee Code: ${employeeData.code}
+Your Designation: ${employeeData.designation}
+Your Department: ${employeeData.department}
+
+You can now access the HRMS portal using your credentials.
+
+Best regards,
+HRMS System
+CECOS University`,
+      from_name: 'HRMS Welcome',
+    });
+
+    console.log(
+      `New employee notification emails sent successfully to ${recipients.length} recipients`,
+      results,
+    );
+    return results;
+  } catch (error) {
+    console.error('New employee notification emails failed:', error);
+    return null;
+  }
+};
+
+export const sendAnnouncementNotification = async (announcementData, currentUserEmail) => {
+  // Get all employees from the store
+  const store = useDataStore.getState();
+  const allEmployees = store.employees || [];
+
+  // Get all employee emails, excluding the current user
+  const recipients = allEmployees
+    .filter((emp) => emp.email && emp.email !== currentUserEmail)
+    .map((emp) => emp.email);
+
+  // If no recipients, log and return
+  if (recipients.length === 0) {
+    console.log('No recipients found for announcement notification');
+    return null;
+  }
+
+  const emailMessage = `New Announcement:
+
+Title: ${announcementData.title}
+
+${announcementData.description}
+
+Audience: ${announcementData.audience}
+Posted by: ${announcementData.postedBy}
+Date: ${new Date().toLocaleString('en-PK')}
+
+Please log in to the HRMS system to view full details.
+
+Best regards,
+HRMS System
+CECOS University`;
+
+  const emailPromises = recipients.map((email) =>
+    sendEmail({
+      to: email,
+      subject: `New Announcement - ${announcementData.title}`,
+      message: emailMessage,
+      from_name: 'HRMS Announcements',
+    }),
+  );
+
+  try {
+    const results = await Promise.all(emailPromises);
+    console.log(
+      `Announcement notification emails sent successfully to ${recipients.length} recipients`,
+      results,
+    );
+    return results;
+  } catch (error) {
+    console.error('Announcement notification emails failed:', error);
+    return null;
+  }
+};
+
+export const sendMeetingNotification = async (meetingData, currentUserEmail) => {
+  // Get all employees from the store
+  const store = useDataStore.getState();
+  const allEmployees = store.employees || [];
+
+  // Get all employee emails, excluding the current user (meeting convener)
+  const recipients = allEmployees
+    .filter((emp) => emp.email && emp.email !== currentUserEmail)
+    .map((emp) => emp.email);
+
+  // If no recipients, log and return
+  if (recipients.length === 0) {
+    console.log('No recipients found for meeting notification');
+    return null;
+  }
+
+  const emailMessage = `Dear Colleague,
+
+You are cordially invited to attend a committee meeting.
+
+Meeting Title: ${meetingData.title}
+Date: ${meetingData.date}
+Time: ${meetingData.time}
+Location: ${meetingData.location}
+
+Agenda:
+${meetingData.agenda}
+
+Convener: ${meetingData.convener}
+
+Please confirm your attendance and inform if you have any specific topics to discuss.
+
+Best regards,
+HRMS System
+CECOS University`;
+
+  const emailPromises = recipients.map((email) =>
+    sendEmail({
+      to: email,
+      subject: `Committee Meeting Invitation - ${meetingData.title}`,
+      message: emailMessage,
+      from_name: `Committee Meeting - ${meetingData.convener}`,
+    }),
+  );
+
+  try {
+    const results = await Promise.all(emailPromises);
+    console.log(
+      `Meeting notification emails sent successfully to ${recipients.length} recipients`,
+      results,
+    );
+    return results;
+  } catch (error) {
+    console.error('Meeting notification emails failed:', error);
+    return null;
+  }
+};

@@ -71,15 +71,7 @@ export default function HRPromotions() {
   const handleSubmitAction = () => {
     if (!selectedPromotion) return;
 
-    if (actionType === 'schedule') {
-      updatePromotionStatus(selectedPromotion.id, 'Under Review', {
-        type: 'committee',
-        meetingDate,
-        notes: reviewNotes,
-        scheduledBy: user?.name,
-        date: format(new Date(), 'yyyy-MM-dd'),
-      });
-    } else if (actionType === 'approve') {
+    if (actionType === 'approve') {
       approvePromotion(selectedPromotion.id);
     } else if (actionType === 'reject') {
       updatePromotionStatus(selectedPromotion.id, 'Rejected', {
@@ -179,6 +171,20 @@ export default function HRPromotions() {
         </div>
       </div>
 
+      {/* Info Box for HR */}
+      <Card className="bg-blue-50 border-blue-200">
+        <div className="flex items-start gap-3">
+          <UserGroupIcon className="w-6 h-6 text-blue-600 shrink-0 mt-1" />
+          <div>
+            <p className="font-medium text-blue-900">Committee Meeting Scheduling</p>
+            <p className="text-sm text-blue-700 mt-1">
+              As HR, you can monitor promotion requests. Committee meeting scheduling is handled by
+              the Dean, who serves as the convener for promotion reviews.
+            </p>
+          </div>
+        </div>
+      </Card>
+
       {/* Promotions List */}
       <Card>
         {filteredPromotions.length === 0 ? (
@@ -234,15 +240,9 @@ export default function HRPromotions() {
                   {/* Actions */}
                   {promotion.status === 'Pending' && (
                     <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleAction(promotion, 'schedule')}
-                        className="gap-1"
-                      >
-                        <UserGroupIcon className="w-4 h-4" />
-                        Schedule Committee
-                      </Button>
+                      <div className="px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-700">
+                        ℹ️ Committee scheduling is handled by Dean
+                      </div>
                       <Button
                         size="sm"
                         variant="outline"
@@ -317,13 +317,7 @@ export default function HRPromotions() {
       <Modal
         isOpen={showActionModal}
         onClose={() => setShowActionModal(false)}
-        title={
-          actionType === 'schedule'
-            ? 'Schedule Committee Meeting'
-            : actionType === 'approve'
-              ? 'Approve Promotion'
-              : 'Reject Promotion'
-        }
+        title={actionType === 'approve' ? 'Approve Promotion' : 'Reject Promotion'}
       >
         {selectedPromotion && (
           <div className="space-y-4">
@@ -334,23 +328,8 @@ export default function HRPromotions() {
               </p>
             </div>
 
-            {actionType === 'schedule' && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Meeting Date</label>
-                <input
-                  type="date"
-                  value={meetingDate}
-                  onChange={(e) => setMeetingDate(e.target.value)}
-                  min={format(new Date(), 'yyyy-MM-dd')}
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
-            )}
-
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                {actionType === 'schedule' ? 'Notes' : 'Comments'}
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Comments</label>
               <textarea
                 value={reviewNotes}
                 onChange={(e) => setReviewNotes(e.target.value)}
@@ -373,16 +352,10 @@ export default function HRPromotions() {
                 className={
                   actionType === 'reject'
                     ? 'bg-red-600 hover:bg-red-700'
-                    : actionType === 'approve'
-                      ? 'bg-green-600 hover:bg-green-700'
-                      : ''
+                    : 'bg-green-600 hover:bg-green-700'
                 }
               >
-                {actionType === 'schedule'
-                  ? 'Schedule Meeting'
-                  : actionType === 'approve'
-                    ? 'Confirm Approval'
-                    : 'Confirm Rejection'}
+                {actionType === 'approve' ? 'Confirm Approval' : 'Confirm Rejection'}
               </Button>
             </div>
           </div>

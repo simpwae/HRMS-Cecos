@@ -1,3 +1,5 @@
+import { useMemo } from 'react';
+import { useAuthStore } from '../../../state/auth';
 import PortalLayout from '../../../app/PortalLayout';
 import {
   HomeIcon,
@@ -14,21 +16,63 @@ import {
   ShieldCheckIcon,
 } from '@heroicons/react/24/outline';
 
-const navItems = [
-  { path: '/hr', label: 'Dashboard', icon: HomeIcon, end: true },
-  { path: '/hr/employees', label: 'Employees', icon: UsersIcon },
-  { path: '/hr/attendance', label: 'Attendance', icon: ClockIcon },
-  { path: '/hr/leaves', label: 'Leave Requests', icon: DocumentTextIcon },
-  { path: '/hr/promotions', label: 'Promotions', icon: ArrowTrendingUpIcon },
-  { path: '/hr/resignations', label: 'Resignations', icon: ArrowRightOnRectangleIcon },
-  { path: '/hr/alumni', label: 'Alumni', icon: AcademicCapIcon },
-  { path: '/hr/analytics', label: 'Analytics', icon: ChartPieIcon },
-  { path: '/hr/reports', label: 'Reports', icon: ChartBarIcon },
-  { path: '/hr/policy-advisory', label: 'Policy Advisory', icon: ShieldCheckIcon },
-  { path: '/hr/announcements', label: 'Announcements', icon: BellIcon },
-  { path: '/hr/settings', label: 'Settings', icon: Cog6ToothIcon },
+const allNavItems = [
+  {
+    path: '/hr',
+    label: 'Dashboard',
+    icon: HomeIcon,
+    end: true,
+    roles: ['hr', 'admin', 'dean', 'hod'],
+  },
+  { path: '/hr/employees', label: 'Employees', icon: UsersIcon, roles: ['hr', 'admin'] },
+  { path: '/hr/attendance', label: 'Attendance', icon: ClockIcon, roles: ['hr', 'admin'] },
+  {
+    path: '/hr/leaves',
+    label: 'Leave Requests',
+    icon: DocumentTextIcon,
+    roles: ['hr', 'admin', 'dean', 'hod'],
+  },
+  {
+    path: '/hr/promotions',
+    label: 'Promotions',
+    icon: ArrowTrendingUpIcon,
+    roles: ['hr', 'admin'],
+  },
+  {
+    path: '/hr/resignations',
+    label: 'Resignations',
+    icon: ArrowRightOnRectangleIcon,
+    roles: ['hr', 'admin'],
+  },
+  {
+    path: '/hr/ex-employees',
+    label: 'Ex-Employees',
+    icon: AcademicCapIcon,
+    roles: ['hr', 'admin'],
+  },
+  { path: '/hr/analytics', label: 'Analytics', icon: ChartPieIcon, roles: ['hr', 'admin'] },
+  { path: '/hr/reports', label: 'Reports', icon: ChartBarIcon, roles: ['hr', 'admin'] },
+  {
+    path: '/hr/policy-advisory',
+    label: 'Policy Advisory',
+    icon: ShieldCheckIcon,
+    roles: ['hr', 'admin'],
+  },
+  { path: '/hr/announcements', label: 'Announcements', icon: BellIcon, roles: ['hr', 'admin'] },
+  { path: '/hr/settings', label: 'Settings', icon: Cog6ToothIcon, roles: ['hr', 'admin'] },
 ];
 
 export default function HRLayout() {
-  return <PortalLayout portalKey="hr" portalName="HR Portal" navItems={navItems} />;
+  const user = useAuthStore((s) => s.user);
+  const userRole = user?.primaryRole || user?.role;
+
+  const navItems = useMemo(() => {
+    return allNavItems.filter((item) => item.roles.includes(userRole));
+  }, [userRole]);
+
+  // Determine portal name based on role
+  const portalName =
+    userRole === 'dean' ? 'Dean Portal' : userRole === 'hod' ? 'HOD Portal' : 'HR Portal';
+
+  return <PortalLayout portalKey="hr" portalName={portalName} navItems={navItems} />;
 }

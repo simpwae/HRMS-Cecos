@@ -11,8 +11,9 @@ import Card from '../../../components/Card';
 import { useDataStore } from '../../../state/data';
 
 export default function AdminDashboard() {
-  const { employees } = useDataStore();
-  const stats = useDataStore((s) => s.getStats());
+  const employees = useDataStore((s) => s.employees);
+  const getStats = useDataStore((s) => s.getStats);
+  const stats = getStats();
 
   const systemStats = [
     {

@@ -351,7 +351,7 @@ export default function HRResignations() {
                   <div>
                     <p className="font-medium text-amber-800">Confirm Exit Completion</p>
                     <p className="text-sm text-amber-700 mt-1">
-                      This will move the employee to alumni records and remove them from active
+                      This will move the employee to ex-employee records and remove them from active
                       employees. This action cannot be undone.
                     </p>
                   </div>

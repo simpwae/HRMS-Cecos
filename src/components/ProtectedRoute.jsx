@@ -32,7 +32,8 @@ export default function ProtectedRoute({ allowedRoles = [], children, redirectTo
       // For now, redirect to their default portal
       const defaultPortal = {
         admin: '/admin',
-        vp: '/vp',
+        president: '/president',
+        vc: '/vc',
         dean: '/dean',
         hod: '/hod',
         hr: '/hr',

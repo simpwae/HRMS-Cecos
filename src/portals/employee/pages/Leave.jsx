@@ -1,12 +1,20 @@
 import { useState, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { format, differenceInDays, parseISO, addDays } from 'date-fns';
-import { useDataStore, leaveTypes } from '../../../state/data';
+import {
+  useDataStore,
+  leaveTypes,
+  validateMaternityEligibility,
+  validateAdvanceNotice,
+  sendLeaveNotification,
+} from '../../../state/data';
 import { useAuthStore } from '../../../state/auth';
 import Card from '../../../components/Card';
 import Button from '../../../components/Button';
 import Badge from '../../../components/Badge';
 import Modal from '../../../components/Modal';
+import FileUpload from '../../../components/FileUpload';
+import FormField from '../../../components/FormField';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../../components/Tabs';
 import {
   DocumentTextIcon,
@@ -16,6 +24,8 @@ import {
   XCircleIcon,
   CalendarDaysIcon,
   ExclamationTriangleIcon,
+  InformationCircleIcon,
+  ArrowDownTrayIcon,
 } from '@heroicons/react/24/outline';
 
 export default function Leave() {
@@ -30,6 +40,8 @@ export default function Leave() {
 
   const [showModal, setShowModal] = useState(false);
   const [selectedLeave, setSelectedLeave] = useState(null);
+  const [uploadedFiles, setUploadedFiles] = useState([]);
+  const [leaveCategory, setLeaveCategory] = useState(null);
 
   const {
     register,
@@ -43,12 +55,27 @@ export default function Leave() {
       startDate: format(addDays(new Date(), 1), 'yyyy-MM-dd'),
       endDate: format(addDays(new Date(), 1), 'yyyy-MM-dd'),
       reason: '',
+      expectedDeliveryDate: '',
     },
   });
 
   const startDate = watch('startDate');
   const endDate = watch('endDate');
   const selectedType = watch('type');
+
+  const isDocumentRequired = selectedType === 'medical' || selectedType === 'study';
+  const uploadLabel =
+    selectedType === 'medical'
+      ? 'Medical Documents'
+      : selectedType === 'study'
+        ? 'Study Documents'
+        : 'Supporting Documents (optional)';
+  const uploadHelper =
+    selectedType === 'medical'
+      ? "Upload medical certificates, prescriptions, or doctor's reports (PDF, DOC, DOCX, JPG)"
+      : selectedType === 'study'
+        ? 'Upload course details, admission letters, or study plans (PDF, DOC, DOCX, JPG)'
+        : 'Upload any supporting documents if applicable (PDF, DOC, DOCX, JPG)';
 
   // Calculate days
   const calculatedDays = useMemo(() => {
@@ -57,14 +84,34 @@ export default function Leave() {
     return days > 0 ? days : 0;
   }, [startDate, endDate]);
 
-  // Leave balance
-  const leaveBalance = employee?.leaveBalance || { annual: 0, sick: 0, casual: 0 };
+  // safer balance lookup with fallback to leave type days
+  const getAvailableBalance = (type) => {
+    const lt = leaveTypes.find((t) => t.id === type);
+    const fallback = lt?.days ?? lt?.defaultDays ?? 0;
+    return employee?.leaveBalance?.[type] ?? fallback;
+  };
 
-  // Check if enough balance
+  // Leave balance (show all known types)
+  const leaveBalance = useMemo(() => {
+    const acc = {};
+    leaveTypes.forEach((lt) => {
+      acc[lt.id] = getAvailableBalance(lt.id);
+    });
+    return acc;
+  }, [employee]);
+
+  // Check if enough balance (allow medical using fallback days)
   const hasEnoughBalance = useMemo(() => {
-    const balance = leaveBalance[selectedType] || 0;
+    const balance = getAvailableBalance(selectedType);
     return calculatedDays <= balance;
-  }, [leaveBalance, selectedType, calculatedDays]);
+  }, [selectedType, calculatedDays, getAvailableBalance]);
+
+  // Check maternity leave eligibility
+  const maternityEligibility = useMemo(() => {
+    return validateMaternityEligibility(employee);
+  }, [employee]);
+
+  const canApplyMaternity = maternityEligibility.eligible;
 
   // My leaves
   const myLeaves = useMemo(
@@ -79,8 +126,50 @@ export default function Leave() {
   const approvedLeaves = myLeaves.filter((l) => l.status === 'Approved');
   const rejectedLeaves = myLeaves.filter((l) => l.status === 'Rejected');
 
+  const handleDownload = (doc) => {
+    const blobUrl = doc?.file ? URL.createObjectURL(doc.file) : doc?.fileUrl || doc?.url;
+    if (!blobUrl) return;
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = doc?.name || 'document';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    if (doc?.file) URL.revokeObjectURL(blobUrl);
+  };
+
   const onSubmit = (data) => {
-    const leaveType = leaveTypes.find((lt) => lt.id === data.type);
+    // Maternity leave comprehensive eligibility check
+    if (data.type === 'maternity') {
+      if (!canApplyMaternity) {
+        alert(`Maternity Leave Eligibility Issue:\n\n${maternityEligibility.reason}`);
+        return;
+      }
+
+      // Validate expected delivery date
+      if (!data.expectedDeliveryDate) {
+        alert('Please enter your expected delivery date');
+        return;
+      }
+
+      // Validate 60-day advance notice
+      const advanceNoticeCheck = validateAdvanceNotice(
+        data.expectedDeliveryDate,
+        format(new Date(), 'yyyy-MM-dd'),
+      );
+      if (!advanceNoticeCheck.valid) {
+        alert(`Maternity Leave - Advance Notice Requirement:\n\n${advanceNoticeCheck.reason}`);
+        return;
+      }
+    }
+
+    // Medical leave document requirement
+    if ((data.type === 'medical' || data.type === 'study') && uploadedFiles.length === 0) {
+      alert(`Please upload supporting documents for ${data.type} leave`);
+      return;
+    }
+
+    const isMedical = data.type === 'medical';
 
     const newLeave = {
       id: `l-${Date.now()}`,
@@ -93,17 +182,44 @@ export default function Leave() {
       endDate: data.endDate,
       days: calculatedDays,
       reason: data.reason,
+      documents: uploadedFiles,
+      leaveCategory: leaveCategory,
       status: 'Pending',
       appliedOn: format(new Date(), 'yyyy-MM-dd'),
-      approvalChain: [
-        { role: 'hod', status: 'pending', by: null, date: null },
-        { role: 'dean', status: 'pending', by: null, date: null },
-        { role: 'hr', status: 'pending', by: null, date: null },
-      ],
+      approvalChain: isMedical
+        ? [
+            { role: 'hod', status: 'pending', by: null, date: null, comment: null },
+            { role: 'vc', status: 'pending', by: null, date: null, comment: null },
+            { role: 'president', status: 'pending', by: null, date: null, comment: null },
+          ]
+        : [
+            { role: 'hod', status: 'pending', by: null, date: null, comment: null },
+            { role: 'dean', status: 'pending', by: null, date: null, comment: null },
+            { role: 'hr', status: 'pending', by: null, date: null, comment: null },
+          ],
+      paidDays: null,
+      unpaidDays: null,
     };
 
     addLeave(newLeave);
+
+    // Send email notifications to all employees except current user
+    sendLeaveNotification(
+      {
+        employeeName: employee?.name || user?.name,
+        leaveType: data.type,
+        startDate: data.startDate,
+        endDate: data.endDate,
+        days: calculatedDays,
+        reason: data.reason,
+        status: 'Pending',
+      },
+      user?.email,
+    );
+
     reset();
+    setUploadedFiles([]);
+    setLeaveCategory(null);
     setShowModal(false);
   };
 
@@ -134,26 +250,26 @@ export default function Leave() {
 
       {/* Leave Balance Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {Object.entries(leaveBalance).map(([type, days]) => {
-          const leaveType = leaveTypes.find((lt) => lt.id === type);
-          const maxDays = leaveType?.defaultDays || 20;
-          const usedDays = maxDays - days;
+        {leaveTypes.map((lt) => {
+          const days = leaveBalance[lt.id];
+          const maxDays = lt.days ?? lt.defaultDays ?? days ?? 0;
+          const usedDays = Math.max(0, maxDays - days);
 
           return (
-            <Card key={type} className="relative overflow-hidden">
+            <Card key={lt.id} className="relative overflow-hidden">
               <div className="absolute top-0 right-0 w-24 h-24 -mr-8 -mt-8">
                 <div
                   className={`w-full h-full rounded-full opacity-10 ${
-                    type === 'annual'
+                    lt.id === 'annual'
                       ? 'bg-blue-500'
-                      : type === 'sick'
+                      : lt.id === 'sick'
                         ? 'bg-red-500'
                         : 'bg-green-500'
                   }`}
                 />
               </div>
               <div className="relative">
-                <p className="text-sm font-medium text-gray-500 capitalize">{type} Leave</p>
+                <p className="text-sm font-medium text-gray-500 capitalize">{lt.name}</p>
                 <p className="text-3xl font-bold text-gray-900 mt-1">{days}</p>
                 <p className="text-xs text-gray-500 mt-1">of {maxDays} days remaining</p>
                 <div className="mt-3 h-2 bg-gray-100 rounded-full overflow-hidden">
@@ -292,11 +408,26 @@ export default function Leave() {
       {/* Apply Leave Modal */}
       <Modal
         isOpen={showModal}
-        onClose={() => setShowModal(false)}
+        onClose={() => {
+          setShowModal(false);
+          setUploadedFiles([]);
+          setLeaveCategory(null);
+        }}
         title="Apply for Leave"
         size="lg"
       >
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          {/* Maternity Leave Warning */}
+          {selectedType === 'maternity' && !canApplyMaternity && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex gap-3">
+              <ExclamationTriangleIcon className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-medium text-red-900">Not Eligible for Maternity Leave</p>
+                <p className="text-sm text-red-700 mt-1">{maternityEligibility.reason}</p>
+              </div>
+            </div>
+          )}
+
           {/* Leave Type */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -306,11 +437,21 @@ export default function Leave() {
               {...register('type', { required: 'Please select a leave type' })}
               className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
             >
-              {leaveTypes.map((lt) => (
-                <option key={lt.id} value={lt.id}>
-                  {lt.name} ({leaveBalance[lt.id] || 0} days available)
-                </option>
-              ))}
+              {leaveTypes.map((lt) => {
+                // Hide maternity leave from non-female employees, disable for ineligible females
+                const isMaternitityLeave = lt.id === 'maternity';
+                const isHidden = isMaternitityLeave && employee?.gender?.toLowerCase() !== 'female';
+                const isDisabled = isMaternitityLeave && !canApplyMaternity;
+
+                if (isHidden) return null;
+
+                return (
+                  <option key={lt.id} value={lt.id} disabled={isDisabled}>
+                    {lt.name} ({leaveBalance[lt.id] || 0} days available)
+                    {isDisabled ? ' - Not eligible' : ''}
+                  </option>
+                );
+              })}
             </select>
             {errors.type && <p className="text-sm text-red-600 mt-1">{errors.type.message}</p>}
           </div>
@@ -369,6 +510,73 @@ export default function Leave() {
             </div>
           )}
 
+          {/* Medical Leave - guidance and category */}
+          {selectedType === 'medical' && (
+            <div className="space-y-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex gap-3">
+                <InformationCircleIcon className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-medium text-blue-900">Medical Leave Requirements</p>
+                  <p className="text-sm text-blue-700 mt-1">
+                    Upload supporting medical documents; HR will review and categorize this as
+                    medical or unpaid leave.
+                  </p>
+                </div>
+              </div>
+
+              <FormField label="Requested Leave Category">
+                <select
+                  value={leaveCategory || ''}
+                  onChange={(e) => setLeaveCategory(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Select category (HR will finalize)</option>
+                  <option value="medical">Medical Leave</option>
+                  <option value="unpaid">Unpaid Leave</option>
+                </select>
+              </FormField>
+            </div>
+          )}
+
+          {/* Study Leave - guidance */}
+          {selectedType === 'study' && (
+            <div className="space-y-4 bg-green-50 border border-green-200 rounded-lg p-4">
+              <div className="flex gap-3">
+                <InformationCircleIcon className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-medium text-green-900">Study Leave Documentation</p>
+                  <p className="text-sm text-green-700 mt-1">
+                    Upload supporting documents such as course enrollment letters, admission
+                    documents, or study plans. Documents are required for study leave.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Universal File Upload - always visible */}
+          <div className="space-y-2">
+            <FileUpload
+              value={uploadedFiles}
+              onChange={setUploadedFiles}
+              label={uploadLabel}
+              required={isDocumentRequired}
+              helper={
+                isDocumentRequired
+                  ? `${uploadHelper} (required for ${selectedType} leave)`
+                  : `${uploadHelper}`
+              }
+              allowedTypes={['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png']}
+              maxFiles={5}
+              maxSizeMB={10}
+            />
+            {isDocumentRequired && (
+              <p className="text-xs text-red-600">
+                Documents are required for {selectedType} leave.
+              </p>
+            )}
+          </div>
+
           {/* Reason */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -385,6 +593,43 @@ export default function Leave() {
             />
             {errors.reason && <p className="text-sm text-red-600 mt-1">{errors.reason.message}</p>}
           </div>
+
+          {/* Maternity Leave - Expected Delivery Date */}
+          {selectedType === 'maternity' && (
+            <div className="space-y-3 bg-pink-50 border border-pink-200 rounded-lg p-4">
+              <div className="flex gap-3">
+                <InformationCircleIcon className="w-5 h-5 text-pink-600 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-medium text-pink-900">Maternity Leave Information</p>
+                  <p className="text-sm text-pink-700 mt-1">
+                    You are entitled to 30 days of paid maternity leave. Applications must be
+                    submitted at least 2 months (60 days) before your expected delivery date.
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Expected Delivery Date <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  {...register('expectedDeliveryDate', {
+                    required: 'Expected delivery date is required for maternity leave',
+                  })}
+                  min={format(addDays(new Date(), 60), 'yyyy-MM-dd')}
+                  className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                />
+                {errors.expectedDeliveryDate && (
+                  <p className="text-sm text-red-600 mt-1">{errors.expectedDeliveryDate.message}</p>
+                )}
+                <p className="text-xs text-gray-500 mt-1">
+                  Must be at least 60 days from today (
+                  {format(addDays(new Date(), 60), 'MMM d, yyyy')})
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Actions */}
           <div className="flex justify-end gap-3 pt-4 border-t">
@@ -448,6 +693,60 @@ export default function Leave() {
                 {format(parseISO(selectedLeave.appliedOn), 'MMMM d, yyyy')}
               </p>
             </div>
+
+            {(selectedLeave.paidDays !== null || selectedLeave.unpaidDays !== null) && (
+              <div className="grid sm:grid-cols-2 gap-4 bg-gray-50 border border-gray-200 rounded-lg p-3">
+                {selectedLeave.paidDays !== null && (
+                  <div>
+                    <p className="text-xs text-gray-500 uppercase">Paid Days</p>
+                    <p className="font-medium text-green-700">{selectedLeave.paidDays}</p>
+                  </div>
+                )}
+                {selectedLeave.unpaidDays !== null && (
+                  <div>
+                    <p className="text-xs text-gray-500 uppercase">Unpaid Days</p>
+                    <p className="font-medium text-amber-700">{selectedLeave.unpaidDays}</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Uploaded Documents */}
+            {selectedLeave.documents && selectedLeave.documents.length > 0 && (
+              <div>
+                <p className="text-xs text-gray-500 uppercase mb-2 flex items-center gap-2">
+                  <DocumentTextIcon className="w-4 h-4" /> Supporting Documents
+                </p>
+                <div className="space-y-2">
+                  {selectedLeave.documents.map((doc) => (
+                    <div
+                      key={doc.id}
+                      className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200"
+                    >
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <DocumentTextIcon className="w-4 h-4 text-gray-400 shrink-0" />
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-gray-900 truncate">{doc.name}</p>
+                          {doc.size && (
+                            <p className="text-xs text-gray-500">
+                              {(doc.size / 1024).toFixed(1)} KB
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <button
+                        className="p-2 text-gray-400 hover:text-blue-600 transition-colors ml-2"
+                        title="Download document"
+                        type="button"
+                        onClick={() => handleDownload(doc)}
+                      >
+                        <ArrowDownTrayIcon className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {selectedLeave.approvalChain && (
               <div>

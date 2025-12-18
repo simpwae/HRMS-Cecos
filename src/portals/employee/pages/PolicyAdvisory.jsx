@@ -14,6 +14,18 @@ import {
 
 const policyDocuments = [
   {
+    id: 10,
+    title: 'CECPF Provident Fund Policy',
+    description:
+      'Official policy document for the CECOS Employees Contributory Provident Fund (CECPF), including eligibility, application, and withdrawal procedures.',
+    category: 'Benefits',
+    fileSize: '2.0 MB',
+    format: 'PDF',
+    lastUpdated: '2021-12-10',
+    status: 'Active',
+    downloadUrl: "/PDF's/4. CECPF 10 Dec 21.pdf",
+  },
+  {
     id: 1,
     title: 'Harassment Policy',
     description:

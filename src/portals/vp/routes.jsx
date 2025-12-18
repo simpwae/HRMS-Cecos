@@ -8,12 +8,13 @@ import VPReports from './pages/Reports';
 import VPAnalytics from './pages/Analytics';
 import VPAdvisory from './pages/Advisory';
 import VPSettings from './pages/Settings';
+import VPMedicalLeaves from './pages/MedicalLeaves';
 
-export const vpRoutes = (
+export const presidentRoutes = (
   <Route
-    path="/vp"
+    path="/president"
     element={
-      <ProtectedRoute allowedRoles={['vp']}>
+      <ProtectedRoute allowedRoles={['president']}>
         <VPLayout />
       </ProtectedRoute>
     }
@@ -24,5 +25,6 @@ export const vpRoutes = (
     <Route path="analytics" element={<VPAnalytics />} />
     <Route path="advisory" element={<VPAdvisory />} />
     <Route path="settings" element={<VPSettings />} />
+    <Route path="medical-leaves" element={<VPMedicalLeaves />} />
   </Route>
 );

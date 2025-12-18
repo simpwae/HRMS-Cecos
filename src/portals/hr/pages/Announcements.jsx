@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { format, parseISO } from 'date-fns';
-import { useDataStore } from '../../../state/data';
+import { useDataStore, sendAnnouncementNotification } from '../../../state/data';
 import { useAuthStore } from '../../../state/auth';
 import Card from '../../../components/Card';
 import Button from '../../../components/Button';
@@ -101,6 +101,18 @@ export default function Announcements() {
     };
 
     setAnnouncements([newAnnouncement, ...announcements]);
+
+    // Send announcement notification emails to all employees except current user
+    sendAnnouncementNotification(
+      {
+        title: data.title,
+        description: data.content,
+        audience: data.targetAudience,
+        postedBy: user?.name || 'HR Department',
+      },
+      user?.email,
+    );
+
     reset();
     setShowModal(false);
   };

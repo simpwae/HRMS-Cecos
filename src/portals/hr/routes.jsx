@@ -11,7 +11,7 @@ import Announcements from './pages/Announcements';
 import Settings from './pages/Settings';
 import Promotions from './pages/Promotions';
 import Resignations from './pages/Resignations';
-import Alumni from './pages/Alumni';
+import ExEmployees from './pages/ExEmployees';
 import Analytics from './pages/Analytics';
 import PolicyAdvisory from './pages/PolicyAdvisory';
 
@@ -19,7 +19,7 @@ export const hrRoutes = (
   <Route
     path="/hr"
     element={
-      <ProtectedRoute allowedRoles={['hr', 'admin']} redirectTo="/login">
+      <ProtectedRoute allowedRoles={['hr', 'admin', 'dean', 'hod']} redirectTo="/login">
         <HRLayout />
       </ProtectedRoute>
     }
@@ -30,7 +30,7 @@ export const hrRoutes = (
     <Route path="leaves" element={<LeavesList />} />
     <Route path="promotions" element={<Promotions />} />
     <Route path="resignations" element={<Resignations />} />
-    <Route path="alumni" element={<Alumni />} />
+    <Route path="ex-employees" element={<ExEmployees />} />
     <Route path="analytics" element={<Analytics />} />
     <Route path="reports" element={<Reports />} />
     <Route path="policy-advisory" element={<PolicyAdvisory />} />

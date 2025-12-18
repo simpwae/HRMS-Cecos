@@ -7,7 +7,7 @@ import {
   UserPlusIcon,
   UserMinusIcon,
   ArrowTrendingUpIcon,
-  ArrowTrendingDownIcon
+  ArrowTrendingDownIcon,
 } from '@heroicons/react/24/outline';
 import {
   BarChart,
@@ -39,7 +39,7 @@ const COLORS = [
 ];
 
 export default function Analytics() {
-  const { employees, alumni, resignations, promotions } = useDataStore();
+  const { employees, exEmployees, resignations, promotions } = useDataStore();
   const [timeRange, setTimeRange] = useState('12'); // months
 
   // Current workforce stats
@@ -47,10 +47,10 @@ export default function Analytics() {
     const active = employees.filter((e) => e.status === 'Active').length;
     const onLeave = employees.filter((e) => e.status === 'On Leave').length;
     const total = employees.length;
-    const totalAlumni = alumni.length;
+    const totalExEmployees = exEmployees.length;
 
-    return { active, onLeave, total, totalAlumni };
-  }, [employees, alumni]);
+    return { active, onLeave, total, totalExEmployees };
+  }, [employees, exEmployees]);
 
   // Monthly hiring & attrition data
   const monthlyData = useMemo(() => {
@@ -69,8 +69,8 @@ export default function Analytics() {
         return isWithinInterval(joinDate, { start: monthStart, end: monthEnd });
       }).length;
 
-      // Count departures (alumni who left this month)
-      const left = alumni.filter((a) => {
+      // Count departures (ex-employees who left this month)
+      const left = exEmployees.filter((a) => {
         if (!a.exitDate) return false;
         const exitDate = parseISO(a.exitDate);
         return isWithinInterval(exitDate, { start: monthStart, end: monthEnd });
@@ -86,7 +86,7 @@ export default function Analytics() {
     }
 
     return data;
-  }, [employees, alumni, timeRange]);
+  }, [employees, exEmployees, timeRange]);
 
   // Department distribution
   const departmentData = useMemo(() => {
@@ -115,7 +115,7 @@ export default function Analytics() {
   // Exit reasons analysis
   const exitReasonData = useMemo(() => {
     const reasonCounts = {};
-    alumni.forEach((a) => {
+    exEmployees.forEach((a) => {
       const reason = a.exitReason || 'Other';
       reasonCounts[reason] = (reasonCounts[reason] || 0) + 1;
     });
@@ -123,7 +123,7 @@ export default function Analytics() {
     return Object.entries(reasonCounts)
       .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value);
-  }, [alumni]);
+  }, [exEmployees]);
 
   // Designation distribution
   const designationData = useMemo(() => {
@@ -277,8 +277,8 @@ export default function Analytics() {
         </Card>
         <Card>
           <div className="text-center">
-            <p className="text-3xl font-bold text-gray-900">{workforceStats.totalAlumni}</p>
-            <p className="text-sm text-gray-500">Total Alumni</p>
+            <p className="text-3xl font-bold text-gray-900">{workforceStats.totalExEmployees}</p>
+            <p className="text-sm text-gray-500">Total Ex-Employees</p>
           </div>
         </Card>
         <Card>

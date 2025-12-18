@@ -1,53 +1,55 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { ToastProvider } from './components/Toast';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { useAuthStore, portalRoutes } from './state/auth';
 
 // Pages
 import Login from './pages/Login';
-import Unauthorized from './pages/Unauthorized';
-import NotFound from './app/NotFound';
+import NotFound from './pages/NotFound';
 
-// Portal Routes
-import { employeeRoutes } from './portals/employee/routes';
-import { hrRoutes } from './portals/hr/routes';
-import { vpRoutes } from './portals/vp/routes';
-import { deanRoutes } from './portals/dean/routes';
-import { hodRoutes } from './portals/hod/routes';
-import { adminRoutes } from './portals/admin/routes';
+// Portal Imports
+import AdminPortal from './portals/admin/AdminPortal';
+import HRPortal from './portals/hr/HRPortal';
+import DeanPortal from './portals/dean/DeanPortal';
+import HODPortal from './portals/hod/HODPortal';
+import EmployeePortal from './portals/employee/EmployeePortal';
+import PresidentPortal from './portals/president/PresidentPortal';
+import VCPortal from './portals/vc/VCPortal';
+import FinancePortal from './portals/finance/FinancePortal';
 
 import './styles/globals.css';
 
 function App() {
-  // Vite provides import.meta.env.BASE_URL (ends with '/'). Remove trailing slash for router basename.
-  const rawBase = import.meta.env.BASE_URL || '/';
-  const basename = rawBase.replace(/\/$/, '');
+  const { isAuthenticated, user } = useAuthStore();
 
   return (
-    <ToastProvider>
-      <BrowserRouter basename={basename}>
-        <Routes>
-          {/* Public Routes */}
-          <Route path="/" element={<Navigate to="/login" replace />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/unauthorized" element={<Unauthorized />} />
+    <Router>
+      <Routes>
+        <Route path="/login" element={<Login />} />
 
-          {/* Portal Routes */}
-          {employeeRoutes}
-          {hrRoutes}
-          {vpRoutes}
-          {deanRoutes}
-          {hodRoutes}
-          {adminRoutes}
+        {/* Protected Routes */}
+        {isAuthenticated ? (
+          <>
+            <Route path="/admin/*" element={<AdminPortal />} />
+            <Route path="/hr/*" element={<HRPortal />} />
+            <Route path="/dean/*" element={<DeanPortal />} />
+            <Route path="/hod/*" element={<HODPortal />} />
+            <Route path="/employee/*" element={<EmployeePortal />} />
+            <Route path="/president/*" element={<PresidentPortal />} />
+            <Route path="/vc/*" element={<VCPortal />} />
+            <Route path="/finance/*" element={<FinancePortal />} />
 
-          {/* Legacy redirects */}
-          <Route path="/employee/login" element={<Navigate to="/login" replace />} />
-          <Route path="/hr/login" element={<Navigate to="/login" replace />} />
+            <Route
+              path="/"
+              element={<Navigate to={portalRoutes[user?.primaryRole] || '/employee'} replace />}
+            />
+          </>
+        ) : (
+          <Route path="*" element={<Navigate to="/login" replace />} />
+        )}
 
-          {/* 404 */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </ToastProvider>
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </Router>
   );
 }
 

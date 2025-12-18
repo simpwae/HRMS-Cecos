@@ -4,6 +4,8 @@ import {
   ClockIcon,
   CalendarDaysIcon,
   DocumentChartBarIcon,
+  BellIcon,
+  ArrowUpIcon,
   Cog6ToothIcon,
 } from '@heroicons/react/24/outline';
 import PortalLayout from '../../../app/PortalLayout';
@@ -13,6 +15,8 @@ const navItems = [
   { path: '/dean/employees', label: 'Faculty Staff', icon: UsersIcon },
   { path: '/dean/attendance', label: 'Attendance', icon: ClockIcon },
   { path: '/dean/leaves', label: 'Leave Requests', icon: CalendarDaysIcon },
+  { path: '/dean/promotions', label: 'Promotions', icon: ArrowUpIcon },
+  { path: '/dean/meetings', label: 'Committee Meetings', icon: BellIcon },
   { path: '/dean/reports', label: 'Reports', icon: DocumentChartBarIcon },
   { path: '/dean/settings', label: 'Settings', icon: Cog6ToothIcon },
 ];

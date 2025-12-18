@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useAuthStore, demoUsers, portalRoutes, roleNames } from '../state/auth';
+import { useAuthStore, roleNames } from '../state/auth';
 import CECOSLogo from '../components/CECOSLogo';
 import Button from '../components/Button';
 import {
@@ -15,6 +15,7 @@ import {
   ShieldCheckIcon,
   BriefcaseIcon,
   Cog6ToothIcon,
+  BanknotesIcon,
 } from '@heroicons/react/24/outline';
 
 const roleIcons = {
@@ -22,8 +23,10 @@ const roleIcons = {
   hr: UserGroupIcon,
   dean: AcademicCapIcon,
   hod: BuildingOfficeIcon,
-  vp: BriefcaseIcon,
+  president: BriefcaseIcon,
+  vc: BriefcaseIcon,
   admin: Cog6ToothIcon,
+  finance: BanknotesIcon, // Add finance icon
 };
 
 const roleDescriptions = {
@@ -31,8 +34,10 @@ const roleDescriptions = {
   hr: 'Manage employees, attendance, leaves, payroll',
   dean: 'Faculty oversight, leave approvals, analytics',
   hod: 'Department management, staff coordination',
-  vp: 'Executive dashboard, university-wide analytics',
+  president: 'Final authority, medical leave approvals',
+  vc: 'Executive oversight, university-wide analytics',
   admin: 'System configuration, user management',
+  finance: 'Manage provident fund requests', // Add finance description
 };
 
 export default function Login() {
@@ -241,22 +246,26 @@ export default function Login() {
             </div>
 
             <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {['employee', 'hr', 'hod', 'dean', 'vp', 'admin'].map((role) => {
-                const Icon = roleIcons[role];
-                return (
-                  <button
-                    key={role}
-                    onClick={() => handleQuickLogin(role)}
-                    disabled={isLoading}
-                    className="flex flex-col items-center gap-2 p-4 rounded-xl border border-gray-200 bg-white hover:border-[hsl(var(--cecos-maroon))] hover:shadow-md transition-all group disabled:opacity-50"
-                  >
-                    <div className="p-2 rounded-lg bg-gray-100 group-hover:bg-[hsl(var(--cecos-maroon)/0.1)] transition-colors">
-                      <Icon className="w-5 h-5 text-gray-600 group-hover:text-[hsl(var(--cecos-maroon))]" />
-                    </div>
-                    <span className="text-sm font-medium text-gray-700">{roleNames[role]}</span>
-                  </button>
-                );
-              })}
+              {['employee', 'hr', 'hod', 'dean', 'president', 'vc', 'admin', 'finance'].map(
+                (role) => {
+                  const Icon = roleIcons[role];
+                  return (
+                    <button
+                      key={role}
+                      onClick={() => handleQuickLogin(role)}
+                      disabled={isLoading}
+                      className="flex flex-col items-center gap-2 p-4 rounded-xl border border-gray-200 bg-white hover:border-[hsl(var(--cecos-maroon))] hover:shadow-md transition-all group disabled:opacity-50"
+                    >
+                      <div className="p-2 rounded-lg bg-gray-100 group-hover:bg-[hsl(var(--cecos-maroon)/0.1)] transition-colors">
+                        <Icon className="w-5 h-5 text-gray-600 group-hover:text-[hsl(var(--cecos-maroon))]" />
+                      </div>
+                      <span className="text-sm font-medium text-gray-700">
+                        {role === 'finance' ? 'Finance' : roleNames[role]}
+                      </span>
+                    </button>
+                  );
+                },
+              )}
             </div>
 
             <p className="mt-4 text-center text-xs text-gray-400">

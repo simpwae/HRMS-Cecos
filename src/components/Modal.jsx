@@ -16,15 +16,17 @@ export default function Modal({ open, isOpen, onClose, title, children, actions,
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4 overflow-y-auto"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-0 sm:p-4"
+      style={{ overscrollBehavior: 'contain', marginTop: '56px' }}
       onClick={onClose}
     >
       <div
         className={`bg-white rounded-t-2xl sm:rounded-xl shadow-2xl w-full ${sizeClasses[size] || sizeClasses.md} max-h-[90vh] sm:max-h-[85vh] overflow-hidden flex flex-col`}
+        style={{ top: 0, bottom: 0, left: 0, right: 0, position: 'relative' }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b bg-white shrink-0">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b bg-white shrink-0 sticky top-0 z-10">
           <h3 className="text-base sm:text-lg font-semibold text-gray-900 pr-4">{title}</h3>
           <button
             onClick={onClose}
@@ -35,7 +37,12 @@ export default function Modal({ open, isOpen, onClose, title, children, actions,
         </div>
 
         {/* Content */}
-        <div className="px-4 sm:px-6 py-4 overflow-y-auto flex-1">{children}</div>
+        <div
+          className="px-4 sm:px-6 py-4 overflow-y-auto flex-1"
+          style={{ maxHeight: 'calc(85vh - 64px)' }}
+        >
+          {children}
+        </div>
 
         {/* Actions */}
         {actions && (

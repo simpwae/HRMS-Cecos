@@ -11,6 +11,8 @@ import {
   XCircleIcon,
   ClockIcon,
   MagnifyingGlassIcon,
+  DocumentIcon,
+  ArrowDownTrayIcon,
 } from '@heroicons/react/24/outline';
 import { format, parseISO, differenceInDays } from 'date-fns';
 
@@ -24,7 +26,7 @@ const TABS = [
 export default function DeptLeaves() {
   const employees = useDataStore((s) => s.employees);
   const leaves = useDataStore((s) => s.leaves);
-  const updateLeave = useDataStore((s) => s.updateLeave);
+  const updateLeaveStatus = useDataStore((s) => s.updateLeaveStatus); // Use the correct approval chain function
   const user = useAuthStore((s) => s.user);
 
   const [activeTab, setActiveTab] = useState('pending');
@@ -98,12 +100,14 @@ export default function DeptLeaves() {
   const handleSubmit = () => {
     if (!selectedLeave || !actionType) return;
 
-    updateLeave(selectedLeave.id, {
-      status: actionType === 'approve' ? 'Approved' : 'Rejected',
-      reviewedBy: user.name,
-      reviewedOn: format(new Date(), 'yyyy-MM-dd'),
-      comments: comment || undefined,
-    });
+    // For medical leaves, HOD just forwards to VC (no paid/unpaid split)
+    updateLeaveStatus(
+      selectedLeave.id,
+      actionType === 'approve' ? 'Approved' : 'Rejected',
+      'hod',
+      user.name,
+      comment || undefined,
+    );
 
     setShowModal(false);
     setSelectedLeave(null);
@@ -315,6 +319,69 @@ export default function DeptLeaves() {
               </p>
             </div>
 
+            {/* Medical Leave Info */}
+            {selectedLeave.type === 'Medical' && actionType === 'approve' && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <p className="text-sm text-blue-900 font-medium mb-2">
+                  🏥 Medical Leave Approval Flow
+                </p>
+                <p className="text-sm text-blue-700">
+                  After your approval, this request will be forwarded to:
+                </p>
+                <ol className="text-sm text-blue-700 mt-2 ml-4 list-decimal space-y-1">
+                  <li>Vice Chancellor for recommendation</li>
+                  <li>President for final approval and paid/unpaid classification</li>
+                </ol>
+              </div>
+            )}
+
+            {/* Documents Section */}
+            {selectedLeave.documents && selectedLeave.documents.length > 0 && (
+              <div className="space-y-3 bg-slate-50 border border-slate-200 rounded-lg p-4">
+                <div className="flex items-center gap-2">
+                  <DocumentIcon className="w-5 h-5 text-slate-600" />
+                  <p className="font-semibold text-slate-900">Supporting Documents</p>
+                </div>
+                <div className="space-y-2">
+                  {selectedLeave.documents.map((doc, idx) => (
+                    <div
+                      key={doc.id || idx}
+                      className="flex items-center justify-between p-3 bg-white border border-slate-200 rounded-lg"
+                    >
+                      <div className="flex items-center gap-3">
+                        <DocumentIcon className="w-5 h-5 text-slate-500" />
+                        <div>
+                          <p className="text-sm font-medium text-slate-900">{doc.name}</p>
+                          <p className="text-xs text-slate-500">
+                            {(doc.size / 1024).toFixed(1)} KB • Uploaded{' '}
+                            {doc.uploadedAt
+                              ? format(parseISO(doc.uploadedAt), 'MMM d, yyyy')
+                              : 'N/A'}
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          const link = document.createElement('a');
+                          link.href = doc.file;
+                          link.download = doc.name;
+                          document.body.appendChild(link);
+                          link.click();
+                          document.body.removeChild(link);
+                        }}
+                        className="text-blue-600 hover:text-blue-700"
+                      >
+                        <ArrowDownTrayIcon className="w-4 h-4" />
+                        Download
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Comment (Optional)
@@ -323,7 +390,11 @@ export default function DeptLeaves() {
                 value={comment}
                 onChange={(e) => setComment(e.target.value)}
                 placeholder={
-                  actionType === 'approve' ? 'Add any notes...' : 'Reason for rejection...'
+                  actionType === 'approve'
+                    ? selectedLeave.type === 'Medical'
+                      ? 'Add recommendation for Vice Chancellor...'
+                      : 'Add any notes...'
+                    : 'Reason for rejection...'
                 }
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
                 rows={3}
@@ -338,7 +409,7 @@ export default function DeptLeaves() {
                 variant={actionType === 'approve' ? 'primary' : 'danger'}
                 onClick={handleSubmit}
               >
-                {actionType === 'approve' ? 'Approve' : 'Reject'}
+                {actionType === 'approve' ? 'Approve & Forward' : 'Reject'}
               </Button>
             </div>
           </div>

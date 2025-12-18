@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { format, parseISO, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
 import {
   UsersIcon,
@@ -14,15 +14,26 @@ import {
   CheckCircleIcon,
   ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline';
-import { useDataStore } from '../../../state/data';
+import { useDataStore, leaveTypes } from '../../../state/data';
 import { useAuthStore } from '../../../state/auth';
 import Card from '../../../components/Card';
 import Badge from '../../../components/Badge';
 import StatCard from '../../../components/StatCard';
 
 export default function HRDashboard() {
+  const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
   const { employees, attendance, leaves } = useDataStore();
+  const userRole = user?.primaryRole || user?.role;
+  const isDean = userRole === 'dean';
+  const isHOD = userRole === 'hod';
+  const isApprover = isDean || isHOD;
+
+  // Helper to get leave type name
+  const getLeaveTypeName = (typeId) => {
+    const type = leaveTypes.find((t) => t.id === typeId);
+    return type ? type.name : typeId;
+  };
 
   // Calculate stats
   const stats = useMemo(() => {
@@ -71,15 +82,26 @@ export default function HRDashboard() {
     };
   }, [employees, attendance, leaves]);
 
-  // Recent leave requests
-  const recentLeaveRequests = useMemo(
-    () =>
-      leaves
-        .filter((l) => l.status === 'Pending')
-        .sort((a, b) => parseISO(b.appliedOn) - parseISO(a.appliedOn))
-        .slice(0, 5),
-    [leaves],
-  );
+  // Recent leave requests - filtered by role
+  const recentLeaveRequests = useMemo(() => {
+    let filteredLeaves = leaves;
+
+    // Filter leaves based on approver role
+    if (isApprover) {
+      const roleToMatch = userRole?.toLowerCase();
+      filteredLeaves = leaves.filter((leave) => {
+        const currentStep = leave.approvalChain?.find((s) => s.role === roleToMatch);
+        return (
+          currentStep?.status === 'pending' &&
+          (leave.status === 'Pending' || leave.status === 'Forwarded')
+        );
+      });
+    } else {
+      filteredLeaves = leaves.filter((l) => l.status === 'Pending');
+    }
+
+    return filteredLeaves.sort((a, b) => parseISO(b.appliedOn) - parseISO(a.appliedOn)).slice(0, 5);
+  }, [leaves, isApprover, userRole]);
 
   // Recent attendance issues
   const attendanceIssues = useMemo(
@@ -108,96 +130,129 @@ export default function HRDashboard() {
       <div className="bg-linear-to-r from-red-800 to-red-900 rounded-2xl p-6 text-white">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold">HR Dashboard</h1>
+            <h1 className="text-2xl font-bold">
+              {isDean ? 'Dean Dashboard' : isHOD ? 'HOD Dashboard' : 'HR Dashboard'}
+            </h1>
             <p className="text-red-100 mt-1">
-              Welcome back, {user?.name?.split(' ')[0]}! Here's your overview for{' '}
-              {format(new Date(), 'EEEE, MMMM d')}
+              Welcome back, {user?.name?.split(' ')[0]}!
+              {isApprover
+                ? ' Review pending leave requests.'
+                : ` Here's your overview for ${format(new Date(), 'EEEE, MMMM d')}`}
             </p>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="bg-white/20 backdrop-blur rounded-lg px-4 py-2">
-              <p className="text-sm text-red-100">Attendance Rate</p>
-              <p className="text-2xl font-bold">{stats.attendanceRate}%</p>
+          {!isApprover && (
+            <div className="flex items-center gap-3">
+              <div className="bg-white/20 backdrop-blur rounded-lg px-4 py-2">
+                <p className="text-sm text-red-100">Attendance Rate</p>
+                <p className="text-2xl font-bold">{stats.attendanceRate}%</p>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
-
       {/* Quick Stats */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          title="Total Employees"
-          value={stats.totalEmployees}
-          subtitle={`${stats.activeEmployees} active, ${stats.onLeave} on leave`}
-          icon={UsersIcon}
-          trend="up"
-          trendValue="+2 this month"
-          color="primary"
-        />
-        <StatCard
-          title="Present Today"
-          value={stats.presentToday}
-          subtitle={`${stats.lateToday} late, ${stats.absentToday} absent`}
-          icon={CheckCircleIcon}
-          color="success"
-        />
-        <StatCard
-          title="Pending Leaves"
-          value={stats.pendingLeaves}
-          subtitle={`${stats.approvedThisMonth} approved this month`}
-          icon={DocumentTextIcon}
-          color={stats.pendingLeaves > 5 ? 'warning' : 'default'}
-        />
-        <StatCard
-          title="Monthly Payroll"
-          value={formatCurrency(stats.totalPayroll)}
-          subtitle="Total base salary expense"
-          icon={CurrencyDollarIcon}
-          color="success"
-        />
-      </div>
-
-      {/* Quick Actions */}
-      <Card>
-        <h3 className="font-semibold text-gray-900 mb-4">Quick Actions</h3>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <Link
-            to="/hr/employees"
-            className="flex flex-col items-center gap-2 p-4 rounded-xl bg-blue-50 hover:bg-blue-100 transition-colors group"
-          >
-            <UsersIcon className="w-6 h-6 text-blue-600 group-hover:scale-110 transition-transform" />
-            <span className="text-sm font-medium text-blue-900">Manage Employees</span>
-          </Link>
-          <Link
-            to="/hr/leaves"
-            className="flex flex-col items-center gap-2 p-4 rounded-xl bg-green-50 hover:bg-green-100 transition-colors group"
-          >
-            <DocumentTextIcon className="w-6 h-6 text-green-600 group-hover:scale-110 transition-transform" />
-            <span className="text-sm font-medium text-green-900">Approve Leaves</span>
-          </Link>
-          <Link
-            to="/hr/attendance"
-            className="flex flex-col items-center gap-2 p-4 rounded-xl bg-amber-50 hover:bg-amber-100 transition-colors group"
-          >
-            <ClockIcon className="w-6 h-6 text-amber-600 group-hover:scale-110 transition-transform" />
-            <span className="text-sm font-medium text-amber-900">View Attendance</span>
-          </Link>
-          <Link
-            to="/hr/reports"
-            className="flex flex-col items-center gap-2 p-4 rounded-xl bg-purple-50 hover:bg-purple-100 transition-colors group"
-          >
-            <ChartBarIcon className="w-6 h-6 text-purple-600 group-hover:scale-110 transition-transform" />
-            <span className="text-sm font-medium text-purple-900">View Reports</span>
-          </Link>
+      {!isApprover ? (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <StatCard
+            title="Total Employees"
+            value={stats.totalEmployees}
+            subtitle={`${stats.activeEmployees} active, ${stats.onLeave} on leave`}
+            icon={UsersIcon}
+            trend="up"
+            trendValue="+2 this month"
+            color="primary"
+          />
+          <StatCard
+            title="Present Today"
+            value={stats.presentToday}
+            subtitle={`${stats.lateToday} late, ${stats.absentToday} absent`}
+            icon={CheckCircleIcon}
+            color="success"
+          />
+          <StatCard
+            title="Pending Leaves"
+            value={stats.pendingLeaves}
+            subtitle={`${stats.approvedThisMonth} approved this month`}
+            icon={DocumentTextIcon}
+            color={stats.pendingLeaves > 5 ? 'warning' : 'default'}
+          />
+          <StatCard
+            title="Monthly Payroll"
+            value={formatCurrency(stats.totalPayroll)}
+            subtitle="Total base salary expense"
+            icon={CurrencyDollarIcon}
+            color="success"
+          />
         </div>
-      </Card>
-
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <StatCard
+            title="Pending Approvals"
+            value={recentLeaveRequests.length}
+            subtitle={`Leave requests awaiting your approval`}
+            icon={DocumentTextIcon}
+            color={recentLeaveRequests.length > 5 ? 'warning' : 'default'}
+          />
+          <StatCard
+            title="Your Department"
+            value={user?.faculty || 'N/A'}
+            subtitle={`${user?.department || 'Department'} Department`}
+            icon={UsersIcon}
+            color="primary"
+          />
+          <StatCard
+            title="Approved This Month"
+            value={stats.approvedThisMonth}
+            subtitle="Leave requests approved"
+            icon={CheckCircleIcon}
+            color="success"
+          />
+        </div>
+      )}
+      {/* Quick Actions */}
+      {!isApprover && (
+        <Card>
+          <h3 className="font-semibold text-gray-900 mb-4">Quick Actions</h3>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <Link
+              to="/hr/employees"
+              className="flex flex-col items-center gap-2 p-4 rounded-xl bg-blue-50 hover:bg-blue-100 transition-colors group"
+            >
+              <UsersIcon className="w-6 h-6 text-blue-600 group-hover:scale-110 transition-transform" />
+              <span className="text-sm font-medium text-blue-900">Manage Employees</span>
+            </Link>
+            <Link
+              to="/hr/leaves"
+              className="flex flex-col items-center gap-2 p-4 rounded-xl bg-green-50 hover:bg-green-100 transition-colors group"
+            >
+              <DocumentTextIcon className="w-6 h-6 text-green-600 group-hover:scale-110 transition-transform" />
+              <span className="text-sm font-medium text-green-900">Approve Leaves</span>
+            </Link>
+            <Link
+              to="/hr/attendance"
+              className="flex flex-col items-center gap-2 p-4 rounded-xl bg-amber-50 hover:bg-amber-100 transition-colors group"
+            >
+              <ClockIcon className="w-6 h-6 text-amber-600 group-hover:scale-110 transition-transform" />
+              <span className="text-sm font-medium text-amber-900">View Attendance</span>
+            </Link>
+            <Link
+              to="/hr/reports"
+              className="flex flex-col items-center gap-2 p-4 rounded-xl bg-purple-50 hover:bg-purple-100 transition-colors group"
+            >
+              <ChartBarIcon className="w-6 h-6 text-purple-600 group-hover:scale-110 transition-transform" />
+              <span className="text-sm font-medium text-purple-900">View Reports</span>
+            </Link>
+          </div>
+        </Card>
+      )}
       {/* Main Content Grid */}
-      <div className="grid lg:grid-cols-2 gap-6">
+      <div className={isApprover ? 'grid gap-6' : 'grid lg:grid-cols-2 gap-6'}>
         {/* Pending Leave Requests */}
         <Card>
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-gray-900">Pending Leave Requests</h3>
+            <h3 className="font-semibold text-gray-900">
+              {isApprover ? 'Leave Requests Awaiting Your Approval' : 'Pending Leave Requests'}
+            </h3>
             <Link
               to="/hr/leaves"
               className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1"
@@ -207,15 +262,23 @@ export default function HRDashboard() {
           </div>
           {recentLeaveRequests.length === 0 ? (
             <div className="text-center py-8">
-              <DocumentTextIcon className="w-12 h-12 text-gray-300 mx-auto mb-2" />
-              <p className="text-gray-500">No pending leave requests</p>
+              <CheckCircleIcon className="w-12 h-12 text-green-300 mx-auto mb-2" />
+              <p className="text-gray-700 font-medium">
+                {isApprover ? 'All Caught Up!' : 'No pending leave requests'}
+              </p>
+              <p className="text-sm text-gray-500 mt-1">
+                {isApprover
+                  ? 'You have no leave requests awaiting your approval at this time.'
+                  : 'No pending leave requests'}
+              </p>
             </div>
           ) : (
             <div className="space-y-3">
               {recentLeaveRequests.map((leave) => (
                 <div
                   key={leave.id}
-                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                  onClick={() => navigate('/hr/leaves')}
+                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
@@ -229,8 +292,8 @@ export default function HRDashboard() {
                     <div>
                       <p className="font-medium text-gray-900">{leave.employeeName}</p>
                       <p className="text-xs text-gray-500">
-                        {leave.type} • {leave.days} day{leave.days > 1 ? 's' : ''} •{' '}
-                        {leave.department}
+                        {getLeaveTypeName(leave.type)} • {leave.days} day{leave.days > 1 ? 's' : ''}{' '}
+                        • {leave.department}
                       </p>
                     </div>
                   </div>
@@ -241,79 +304,82 @@ export default function HRDashboard() {
           )}
         </Card>
 
-        {/* Attendance Issues */}
-        <Card>
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-gray-900">Recent Attendance Issues</h3>
-            <Link
-              to="/hr/attendance"
-              className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1"
-            >
-              View All <ArrowRightIcon className="w-4 h-4" />
-            </Link>
-          </div>
-          {attendanceIssues.length === 0 ? (
-            <div className="text-center py-8">
-              <CheckCircleIcon className="w-12 h-12 text-green-300 mx-auto mb-2" />
-              <p className="text-gray-500">No attendance issues</p>
+        {/* Attendance Issues - Only for HR */}
+        {!isApprover && (
+          <Card>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-gray-900">Recent Attendance Issues</h3>
+              <Link
+                to="/hr/attendance"
+                className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1"
+              >
+                View All <ArrowRightIcon className="w-4 h-4" />
+              </Link>
             </div>
-          ) : (
-            <div className="space-y-3">
-              {attendanceIssues.map((issue) => (
-                <div
-                  key={issue.id}
-                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                >
-                  <div className="flex items-center gap-3">
-                    <div
-                      className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                        issue.status === 'Late' ? 'bg-yellow-100' : 'bg-red-100'
-                      }`}
-                    >
-                      <ExclamationTriangleIcon
-                        className={`w-5 h-5 ${
-                          issue.status === 'Late' ? 'text-yellow-600' : 'text-red-600'
-                        }`}
-                      />
-                    </div>
-                    <div>
-                      <p className="font-medium text-gray-900">
-                        {issue.employee?.name || 'Unknown'}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {format(parseISO(issue.date), 'MMM d, yyyy')} •{' '}
-                        {issue.clockIn || 'No clock in'}
-                      </p>
-                    </div>
-                  </div>
-                  <Badge variant={issue.status === 'Late' ? 'warning' : 'error'}>
-                    {issue.status}
-                  </Badge>
-                </div>
-              ))}
-            </div>
-          )}
-        </Card>
-      </div>
-
-      {/* Department Overview */}
-      <Card>
-        <h3 className="font-semibold text-gray-900 mb-4">Department Overview</h3>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {['Computing', 'Engineering', 'Management', 'Sciences'].map((faculty) => {
-            const facultyEmployees = employees.filter((e) => e.faculty === faculty);
-            return (
-              <div key={faculty} className="p-4 bg-gray-50 rounded-xl">
-                <p className="font-medium text-gray-900">{faculty}</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">{facultyEmployees.length}</p>
-                <p className="text-xs text-gray-500">
-                  {facultyEmployees.filter((e) => e.status === 'Active').length} active
-                </p>
+            {attendanceIssues.length === 0 ? (
+              <div className="text-center py-8">
+                <CheckCircleIcon className="w-12 h-12 text-green-300 mx-auto mb-2" />
+                <p className="text-gray-500">No attendance issues</p>
               </div>
-            );
-          })}
-        </div>
-      </Card>
+            ) : (
+              <div className="space-y-3">
+                {attendanceIssues.map((issue) => (
+                  <div
+                    key={issue.id}
+                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                          issue.status === 'Late' ? 'bg-yellow-100' : 'bg-red-100'
+                        }`}
+                      >
+                        <ExclamationTriangleIcon
+                          className={`w-5 h-5 ${
+                            issue.status === 'Late' ? 'text-yellow-600' : 'text-red-600'
+                          }`}
+                        />
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-900">
+                          {issue.employee?.name || 'Unknown'}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {format(parseISO(issue.date), 'MMM d, yyyy')} •{' '}
+                          {issue.clockIn || 'No clock in'}
+                        </p>
+                      </div>
+                    </div>
+                    <Badge variant={issue.status === 'Late' ? 'warning' : 'error'}>
+                      {issue.status}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+        )}
+      </div>{' '}
+      {/* Department Overview - Only for HR */}
+      {!isApprover && (
+        <Card>
+          <h3 className="font-semibold text-gray-900 mb-4">Department Overview</h3>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {['Computing', 'Engineering', 'Management', 'Sciences'].map((faculty) => {
+              const facultyEmployees = employees.filter((e) => e.faculty === faculty);
+              return (
+                <div key={faculty} className="p-4 bg-gray-50 rounded-xl">
+                  <p className="font-medium text-gray-900">{faculty}</p>
+                  <p className="text-2xl font-bold text-gray-900 mt-1">{facultyEmployees.length}</p>
+                  <p className="text-xs text-gray-500">
+                    {facultyEmployees.filter((e) => e.status === 'Active').length} active
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      )}
     </div>
   );
 }

@@ -1,7 +1,14 @@
 import { useState, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { format, parseISO } from 'date-fns';
-import { useDataStore, faculties, departments, designations } from '../../../state/data';
+import {
+  useDataStore,
+  faculties,
+  departments,
+  designations,
+  sendNewEmployeeNotification,
+} from '../../../state/data';
+import { useAuthStore } from '../../../state/auth';
 import Card from '../../../components/Card';
 import Badge from '../../../components/Badge';
 import Button from '../../../components/Button';
@@ -22,6 +29,7 @@ import {
 } from '@heroicons/react/24/outline';
 
 export default function Employees() {
+  const user = useAuthStore((s) => s.user);
   const { employees, addEmployee, updateEmployee, removeEmployee } = useDataStore();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
@@ -35,8 +43,10 @@ export default function Employees() {
     handleSubmit,
     reset,
     setValue,
-    formState: { errors },
+    watch,
+    formState: { errors, isSubmitting },
   } = useForm({
+    mode: 'onChange',
     defaultValues: {
       code: '',
       name: '',
@@ -48,6 +58,9 @@ export default function Employees() {
       joinDate: format(new Date(), 'yyyy-MM-dd'),
       salaryBase: 100000,
       status: 'Active',
+      gender: 'male',
+      employmentStatus: 'confirmed',
+      probationEndDate: '',
       cnic: '',
       bankAccount: '',
       address: '',
@@ -72,15 +85,33 @@ export default function Employees() {
 
   // Handle form submit
   const onSubmit = (data) => {
+    // Clean up probation end date if not on probation
+    const cleanedData = {
+      ...data,
+      salaryBase: parseInt(data.salaryBase),
+      probationEndDate:
+        data.employmentStatus === 'probation' && data.probationEndDate
+          ? data.probationEndDate
+          : null,
+    };
+
     if (selectedEmployee) {
-      updateEmployee(selectedEmployee.id, data);
+      updateEmployee(selectedEmployee.id, cleanedData);
     } else {
-      addEmployee({
-        id: `e${Date.now()}`,
-        ...data,
-        salaryBase: parseInt(data.salaryBase),
-        leaveBalance: { annual: 20, sick: 12, casual: 10 },
-      });
+      addEmployee(cleanedData);
+
+      // Send new employee notification emails to all employees except current user
+      sendNewEmployeeNotification(
+        {
+          name: cleanedData.name,
+          code: cleanedData.code || `EMP${String(employees.length + 1).padStart(3, '0')}`,
+          email: cleanedData.email,
+          designation: cleanedData.designation,
+          department: cleanedData.department,
+          joinDate: cleanedData.joinDate,
+        },
+        user?.email,
+      );
     }
     handleCloseModal();
   };
@@ -254,10 +285,29 @@ export default function Employees() {
                       <div className="flex items-center gap-3">
                         <Avatar name={emp.name} size="sm" />
                         <div>
-                          <p className="font-medium text-gray-900">{emp.name}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium text-gray-900">{emp.name}</p>
+                            <Badge
+                              variant={emp.gender === 'female' ? 'info' : 'secondary'}
+                              className="text-xs"
+                            >
+                              {emp.gender === 'female' ? '♀ Female' : '♂ Male'}
+                            </Badge>
+                            {emp.employmentStatus === 'probation' && (
+                              <Badge variant="warning" className="text-xs">
+                                Probation
+                              </Badge>
+                            )}
+                          </div>
                           <p className="text-xs text-gray-500">
                             {emp.code} • {emp.email}
                           </p>
+                          {emp.employmentStatus === 'probation' && emp.probationEndDate && (
+                            <p className="text-xs text-orange-600 mt-1">
+                              Probation ends:{' '}
+                              {format(parseISO(emp.probationEndDate), 'MMM d, yyyy')}
+                            </p>
+                          )}
                         </div>
                       </div>
                     </td>
@@ -442,6 +492,30 @@ export default function Employees() {
               </div>
               <div className="grid sm:grid-cols-2 gap-4">
                 <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Gender</label>
+                  <select
+                    {...register('gender')}
+                    className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  >
+                    <option value="male">Male</option>
+                    <option value="female">Female</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Employment Status
+                  </label>
+                  <select
+                    {...register('employmentStatus')}
+                    className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  >
+                    <option value="confirmed">Confirmed</option>
+                    <option value="probation">Probation</option>
+                  </select>
+                </div>
+              </div>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Join Date</label>
                   <input
                     type="date"
@@ -461,56 +535,94 @@ export default function Employees() {
                   />
                 </div>
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Probation End Date
+                  <span className="text-gray-500 text-xs ml-2">
+                    (Auto-calculated if on probation, otherwise leave empty)
+                  </span>
+                </label>
+                <input
+                  type="date"
+                  {...register('probationEndDate')}
+                  disabled={watch('employmentStatus') !== 'probation'}
+                  className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
+                />
+                <p className="text-xs text-gray-500 mt-1">Only applicable for probation status</p>
+              </div>
             </TabsContent>
 
             <TabsContent value="additional" className="space-y-4 pt-4">
               <div className="grid sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">CNIC</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    CNIC <span className="text-red-500">*</span>
+                  </label>
                   <input
-                    {...register('cnic')}
+                    {...register('cnic', { required: 'CNIC is required' })}
                     placeholder="XXXXX-XXXXXXX-X"
                     className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                   />
+                  {errors.cnic && (
+                    <p className="text-sm text-red-600 mt-1">{errors.cnic.message}</p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Bank Account
+                    Bank Account <span className="text-red-500">*</span>
                   </label>
                   <input
-                    {...register('bankAccount')}
+                    {...register('bankAccount', { required: 'Bank account is required' })}
                     placeholder="Bank-AccountNumber"
                     className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                   />
+                  {errors.bankAccount && (
+                    <p className="text-sm text-red-600 mt-1">{errors.bankAccount.message}</p>
+                  )}
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Address <span className="text-red-500">*</span>
+                </label>
                 <textarea
-                  {...register('address')}
+                  {...register('address', { required: 'Address is required' })}
                   rows={2}
                   placeholder="Enter address"
                   className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                 />
+                {errors.address && (
+                  <p className="text-sm text-red-600 mt-1">{errors.address.message}</p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Emergency Contact
+                  Emergency Contact <span className="text-red-500">*</span>
                 </label>
                 <input
-                  {...register('emergencyContact')}
+                  {...register('emergencyContact', { required: 'Emergency contact is required' })}
                   placeholder="+92-XXX-XXXXXXX"
                   className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                 />
+                {errors.emergencyContact && (
+                  <p className="text-sm text-red-600 mt-1">{errors.emergencyContact.message}</p>
+                )}
               </div>
             </TabsContent>
           </Tabs>
 
           <div className="flex justify-end gap-3 pt-4 border-t">
-            <Button type="button" variant="outline" onClick={handleCloseModal}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleCloseModal}
+              disabled={isSubmitting}
+            >
               Cancel
             </Button>
-            <Button type="submit">{selectedEmployee ? 'Update Employee' : 'Add Employee'}</Button>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? 'Saving...' : selectedEmployee ? 'Update Employee' : 'Add Employee'}
+            </Button>
           </div>
         </form>
       </Modal>
@@ -535,6 +647,12 @@ export default function Employees() {
                   <Badge variant={viewEmployee.status === 'Active' ? 'success' : 'warning'}>
                     {viewEmployee.status}
                   </Badge>
+                  <Badge variant={viewEmployee.gender === 'female' ? 'info' : 'secondary'}>
+                    {viewEmployee.gender === 'female' ? '♀ Female' : '♂ Male'}
+                  </Badge>
+                  {viewEmployee.employmentStatus === 'probation' && (
+                    <Badge variant="warning">Probation</Badge>
+                  )}
                 </div>
               </div>
             </div>
@@ -572,6 +690,14 @@ export default function Employees() {
                   <p className="text-xs text-gray-500">Base Salary</p>
                   <p className="font-medium">{formatCurrency(viewEmployee.salaryBase)}</p>
                 </div>
+                {viewEmployee.employmentStatus === 'probation' && viewEmployee.probationEndDate && (
+                  <div>
+                    <p className="text-xs text-gray-500">Probation End Date</p>
+                    <p className="font-medium text-orange-600">
+                      {format(parseISO(viewEmployee.probationEndDate), 'MMMM d, yyyy')}
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 
