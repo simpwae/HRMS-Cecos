@@ -1,6 +1,14 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { format, subDays, addDays, differenceInDays, parseISO } from 'date-fns';
+import {
+  format,
+  subDays,
+  addDays,
+  differenceInDays,
+  parseISO,
+  startOfMonth,
+  endOfMonth,
+} from 'date-fns';
 
 const today = new Date();
 
@@ -134,7 +142,7 @@ export const promotionPath = {
 // Leave types with medical leave configuration
 export const leaveTypes = [
   { id: 'annual', name: 'Annual Leave', days: 30, color: 'blue' },
-  { id: 'sick', name: 'Sick Leave', days: 10, color: 'red' }, // keep, but lower
+  { id: 'sick', name: 'Sick Leave', days: 10, color: 'red' },
   { id: 'casual', name: 'Casual Leave', days: 10, color: 'purple' },
   {
     id: 'maternity',
@@ -147,13 +155,70 @@ export const leaveTypes = [
   {
     id: 'medical',
     name: 'Medical Leave',
-    days: 30, // increased allowance to prevent blocking
+    days: 30,
     color: 'teal',
     requiresDocuments: true,
     approvalFlow: ['hod', 'vc', 'president'],
   },
   { id: 'unpaid', name: 'Unpaid Leave', days: 0, color: 'gray' },
 ];
+
+// Special leave types (complementary leaves)
+export const specialLeaveTypes = [
+  { id: 'marriage', name: 'Marriage Leave', days: 3, color: 'green' },
+  { id: 'hajj', name: 'Hajj Leave', days: 30, color: 'indigo' },
+  { id: 'umrah', name: 'Umrah Leave', days: 14, color: 'indigo' },
+  { id: 'msphd', name: 'MS/PhD Study Leave', days: 60, color: 'orange' },
+  { id: 'other', name: 'Other Complementary Leave', days: 5, color: 'gray' },
+];
+
+// Attendance types beyond Absent
+export const attendanceTypes = [
+  { id: 'present', name: 'Present', color: 'green' },
+  { id: 'absent', name: 'Absent', color: 'red' },
+  { id: 'late', name: 'Late Arrival', color: 'yellow' },
+  { id: 'approved_leave', name: 'Approved Leave', color: 'blue' },
+  { id: 'official_duty', name: 'Official Duty', color: 'purple' },
+  { id: 'special_leave', name: 'Special Leave', color: 'indigo' },
+];
+
+// Leave approval hierarchy
+export const approvalHierarchy = {
+  annual: ['hod', 'dean', 'hr'],
+  sick: ['hod', 'dean', 'hr'],
+  casual: ['hod', 'dean', 'hr'],
+  maternity: ['hod', 'vc', 'president'],
+  medical: ['hod', 'vc', 'president'],
+  marriage: ['hod', 'hr'],
+  hajj: ['hod', 'vc', 'president'],
+  umrah: ['hod', 'hr'],
+  msphd: ['hod', 'vc', 'president'],
+  other: ['hod', 'hr'],
+};
+
+// ATS stages and selection board checkpoints
+export const atsStages = [
+  { id: 'applied', name: 'Applied' },
+  { id: 'screening', name: 'Screening' },
+  { id: 'shortlisted', name: 'Shortlisted' },
+  { id: 'technical', name: 'Technical Interview' },
+  { id: 'panel', name: 'Panel' },
+  { id: 'selection_board', name: 'Selection Board' },
+  { id: 'offer', name: 'Offer' },
+  { id: 'hired', name: 'Hired' },
+  { id: 'rejected', name: 'Rejected' },
+];
+
+export const selectionBoardWorkflow = {
+  defaultMembers: ['hod', 'dean', 'hr'],
+  requiredApprovals: 2,
+  checklist: [
+    'Qualification verification',
+    'Experience validation',
+    'Salary fitment and grade check',
+    'Reference check initiated',
+  ],
+};
 
 // Exit survey questions
 export const exitSurveyQuestions = [
@@ -182,7 +247,8 @@ export const exitSurveyQuestions = [
 ];
 
 // Initial mock data
-const initialEmployees = [
+// Base employees seed; enriched below with lifecycle/salary history
+const baseEmployees = [
   {
     id: 'e1',
     code: 'EMP001',
@@ -324,6 +390,51 @@ const initialEmployees = [
     publications: [],
   },
 ];
+
+// Enrich base employees with versioned lifecycle and salary history
+const initialEmployees = baseEmployees.map((emp, idx) => {
+  const joinDate = emp.joinDate || format(today, 'yyyy-MM-dd');
+  const baseSalary = emp.salaryBase || 0;
+
+  const salaryHistory = [
+    {
+      id: generateId('sal'),
+      type: 'base',
+      amount: baseSalary,
+      previousAmount: null,
+      reason: 'Joining salary',
+      effectiveDate: joinDate,
+      reference: 'joining',
+      createdAt: joinDate,
+    },
+  ];
+
+  const lifecycle = [
+    {
+      id: generateId('life'),
+      type: 'joining',
+      title: 'Joining',
+      effectiveDate: joinDate,
+      meta: { designation: emp.designation, salary: baseSalary },
+      createdAt: joinDate,
+    },
+  ];
+
+  return {
+    ...emp,
+    salaryBase: baseSalary,
+    salaryHistory: emp.salaryHistory || salaryHistory,
+    lifecycle: emp.lifecycle || lifecycle,
+    contract: emp.contract || {
+      status: 'active',
+      startDate: joinDate,
+      endDate: emp.contractEndDate || null,
+      renewals: [],
+    },
+    version: emp.version || 1,
+    lastUpdated: emp.lastUpdated || joinDate,
+  };
+});
 
 // Generate attendance for past 30 days
 function generateAttendance() {
@@ -479,6 +590,9 @@ const initialLeaves = [
   },
 ];
 
+// Initial attendance corrections
+const initialAttendanceCorrections = [];
+
 // Initial notifications
 const initialNotifications = [
   {
@@ -537,6 +651,8 @@ const initialResignations = [
     exitSurvey: null,
     hrApproval: null,
     handoverStatus: 'pending',
+    exitInterview: null,
+    exitDocuments: [],
   },
 ];
 
@@ -554,6 +670,8 @@ const initialExEmployees = [
     exitDate: format(subDays(today, 180), 'yyyy-MM-dd'),
     yearsOfService: 8,
     exitReason: 'Better Opportunity',
+    exitInterview: null,
+    exitDocuments: [],
     exitSurvey: {
       reason: 'Better Opportunity',
       satisfaction: 4,
@@ -577,6 +695,8 @@ const initialExEmployees = [
     exitDate: format(subDays(today, 365), 'yyyy-MM-dd'),
     yearsOfService: 14,
     exitReason: 'Retirement',
+    exitInterview: null,
+    exitDocuments: [],
     exitSurvey: {
       reason: 'Retirement',
       satisfaction: 5,
@@ -619,6 +739,280 @@ const initialAnnouncements = [
   },
 ];
 
+// Initial performance reviews (PAMS-like data)
+const initialPerformanceReviews = [
+  {
+    id: generateId('prv'),
+    employeeId: 'e1',
+    period: '2025-Q2',
+    reviewer: 'HOD CS',
+    rating: 4.2, // overall rating out of 5
+    kpis: {
+      teaching: 4.5,
+      research: 4.0,
+      service: 4.0,
+      punctuality: 4.3,
+    },
+    comments: 'Consistent performance; published 2 papers.',
+    date: format(subDays(today, 90), 'yyyy-MM-dd'),
+  },
+  {
+    id: generateId('prv'),
+    employeeId: 'e3',
+    period: '2025-Q2',
+    reviewer: 'Dean Management',
+    rating: 4.6,
+    kpis: {
+      teaching: 4.8,
+      research: 4.7,
+      service: 4.2,
+      punctuality: 4.4,
+    },
+    comments: 'Strong research output and mentorship.',
+    date: format(subDays(today, 88), 'yyyy-MM-dd'),
+  },
+];
+
+const initialBulkIncrements = [];
+const initialProfileRequests = [];
+const initialCandidates = [
+  {
+    id: 'cand1',
+    name: 'Adeel Rahman',
+    email: 'adeel.rahman@example.com',
+    phone: '+92-300-1111111',
+    department: 'CS',
+    role: 'Assistant Professor',
+    stage: 'shortlisted',
+    source: 'LinkedIn',
+    appliedOn: format(subDays(today, 7), 'yyyy-MM-dd'),
+    resumeUrl: 'https://drive.google.com/file/d/abc123',
+    documents: [
+      {
+        id: 'doc1',
+        name: 'CV.pdf',
+        url: 'https://drive.google.com/file/d/abc123',
+        type: 'resume',
+        version: 1,
+        storage: 'google-drive',
+      },
+    ],
+    evaluations: [
+      {
+        stage: 'screening',
+        by: 'HR Manager',
+        score: 7.5,
+        notes: 'Meets minimum criteria',
+        date: format(subDays(today, 6), 'yyyy-MM-dd'),
+      },
+      {
+        stage: 'technical',
+        by: 'CS HOD',
+        score: 8.2,
+        notes: 'Good research portfolio and teaching demos',
+        date: format(subDays(today, 3), 'yyyy-MM-dd'),
+      },
+    ],
+    selectionBoard: {
+      status: 'pending',
+      members: ['hod', 'dean', 'hr'],
+      approvals: [],
+      checklist: selectionBoardWorkflow.checklist,
+    },
+    status: 'In Progress',
+  },
+];
+const initialDocuments = [
+  {
+    id: 'doc-global-policy',
+    title: 'HR Policy Handbook',
+    owner: 'HR',
+    type: 'policy',
+    version: 3,
+    storage: 'google-drive',
+    link: 'https://drive.google.com/file/d/policy123',
+    lastUpdated: format(subDays(today, 15), 'yyyy-MM-dd'),
+    access: 'org',
+    tags: ['policy', 'handbook'],
+  },
+];
+
+// ============ DOCUMENT MANAGEMENT SCHEMA STANDARDIZATION ============
+// All documents across the system should conform to this standardized schema
+// for consistency and future Google Drive / backend storage integration
+//
+// STANDARDIZED DOCUMENT SCHEMA:
+// {
+//   id: string (unique identifier, e.g., 'doc-emp-123-cert-456'),
+//   name: string (display name, e.g., 'PhD Certificate'),
+//   title: string (optional, longer form title),
+//   type: string ('policy', 'certificate', 'medical', 'resume', 'contract', 'publication', 'id_proof', 'qualification', 'award', 'other'),
+//   owner: string (user/employee ID who owns/uploaded the document),
+//   ownerName: string (display name of owner),
+//   uploadDate: string (ISO date, e.g., '2024-12-29'),
+//   expiryDate: string | null (ISO date for documents that expire, e.g., certifications),
+//   tags: array<string> (e.g., ['certification', 'professional', 'mandatory']),
+//   version: number (version number, incremented on each update),
+//   storageRef: string (reference to storage location - Google Drive file ID, S3 key, or local path),
+//   storageType: string ('google-drive', 's3', 'local', 'url'),
+//   url: string (public/authenticated URL to access document),
+//   size: number (file size in bytes),
+//   mimeType: string (e.g., 'application/pdf', 'image/jpeg'),
+//   metadata: object ({
+//     entityType: string ('employee', 'leave', 'candidate', 'promotion', 'correction'),
+//     entityId: string (ID of related entity, e.g., leave ID, employee ID),
+//     uploadedBy: string (user ID who uploaded),
+//     isVerified: boolean (HR verification flag),
+//     verifiedBy: string | null (HR user ID),
+//     verifiedAt: string | null (ISO timestamp)
+//   }),
+//   access: string ('private', 'employee', 'hr', 'manager', 'org'),
+//   status: string ('active', 'archived', 'expired', 'replaced'),
+//   previousVersion: string | null (ID of previous version if replaced)
+// }
+//
+// DOCUMENT TYPES MAPPING:
+// - Employee Profile: 'id_proof', 'qualification', 'certification', 'publication', 'award'
+// - Leave Applications: 'medical', 'supporting_document'
+// - Attendance Corrections: 'screenshot', 'email', 'supporting_document'
+// - Recruitment: 'resume', 'cover_letter', 'reference', 'transcript'
+// - Promotions: 'certificate', 'publication', 'achievement'
+// - Resignations: 'resignation_letter', 'handover_checklist', 'exit_survey'
+// - HR Policies: 'policy', 'handbook', 'form_template'
+//
+// INTEGRATION POINTS:
+// - Google Drive API: Use storageType: 'google-drive', storageRef: fileId
+// - Backend Upload API: POST /api/documents/upload (multipart/form-data)
+// - Document Retrieval: GET /api/documents/:id/download (authenticated)
+// - Version Control: POST /api/documents/:id/versions (upload new version)
+// - Expiry Tracking: Background job checks expiryDate daily, flags expired docs
+//
+// MIGRATION PATH:
+// - Existing documents with inconsistent schemas should be migrated to this format
+// - Fields like 'file', 'uploadedAt', 'link' should map to standardized fields
+// - Add metadata.entityType and metadata.entityId for relationship tracking
+//
+const initialPayrollSettings = {
+  workingDays: 22,
+  allowanceConfig: {
+    housePercent: 45,
+    medicalPercent: 10,
+    transportFixed: 5000,
+  },
+  deductionConfig: {
+    latePenalty: 500,
+    absentPenaltyType: 'daily_rate',
+    absentPenaltyValue: 0,
+    taxThreshold: 100000,
+    taxRate: 5,
+  },
+  overtimeRate: 1.5,
+  operationalConfig: {
+    overtimeWarningHours: 40,
+    expiryHorizonDays: 30,
+  },
+};
+
+const initialPayrollRuns = [];
+
+const appendLifecycleEvent = (employee, event) => {
+  const lifecycle = [...(employee.lifecycle || []), { ...event, id: generateId('life') }];
+  return {
+    ...employee,
+    lifecycle,
+    version: (employee.version || 1) + 1,
+    lastUpdated: event.effectiveDate || format(today, 'yyyy-MM-dd'),
+  };
+};
+
+const appendSalaryHistory = (employee, record) => {
+  const effectiveDate = record.effectiveDate || format(today, 'yyyy-MM-dd');
+  const salaryHistory = [
+    ...(employee.salaryHistory || []),
+    {
+      id: generateId('sal'),
+      previousAmount: employee.salaryBase || 0,
+      amount: record.amount,
+      type: record.type || 'adjustment',
+      reason: record.reason || 'Salary update',
+      effectiveDate,
+      reference: record.reference || null,
+      createdAt: format(today, 'yyyy-MM-dd'),
+      createdBy: record.createdBy || 'system',
+    },
+  ];
+
+  return {
+    ...employee,
+    salaryBase: record.amount,
+    salaryHistory,
+    version: (employee.version || 1) + 1,
+    lastUpdated: effectiveDate,
+  };
+};
+
+const calculatePayrollItem = (employee, monthAttendance, period, settings, exceptions = []) => {
+  const workingDays = settings?.workingDays || 22;
+  const baseSalary = employee.salaryBase || 0;
+
+  const presentDays = monthAttendance.filter((a) => a.status === 'Present').length;
+  const lateDays = monthAttendance.filter((a) => a.status === 'Late').length;
+  const absentDays = monthAttendance.filter((a) => a.status === 'Absent').length;
+
+  const allowanceConfig = settings?.allowanceConfig || {};
+  const deductionConfig = settings?.deductionConfig || {};
+
+  const houseAllowance = Math.round(baseSalary * ((allowanceConfig.housePercent || 0) / 100));
+  const medicalAllowance = Math.round(baseSalary * ((allowanceConfig.medicalPercent || 0) / 100));
+  const transportAllowance = Math.round(allowanceConfig.transportFixed || 0);
+  const allowancesTotal = houseAllowance + medicalAllowance + transportAllowance;
+
+  const lateDeduction = Math.round(lateDays * (deductionConfig.latePenalty || 0));
+  const absentDeduction = (() => {
+    if (deductionConfig.absentPenaltyType === 'none') return 0;
+    if (deductionConfig.absentPenaltyType === 'fixed') {
+      return Math.round(absentDays * (deductionConfig.absentPenaltyValue || 0));
+    }
+    // default to daily rate
+    return Math.round((baseSalary / workingDays) * absentDays);
+  })();
+
+  const taxableBase = baseSalary + allowancesTotal;
+  const taxThreshold = deductionConfig.taxThreshold || 0;
+  const taxRate = deductionConfig.taxRate || 0;
+  const taxDeduction = taxableBase > taxThreshold ? Math.round(taxableBase * (taxRate / 100)) : 0;
+
+  const deductionsTotal = lateDeduction + absentDeduction + taxDeduction;
+  const gross = baseSalary + allowancesTotal;
+  const net = gross - deductionsTotal;
+
+  return {
+    employeeId: employee.id,
+    employeeName: employee.name,
+    department: employee.department,
+    designation: employee.designation,
+    baseSalary,
+    period,
+    attendance: { present: presentDays, late: lateDays, absent: absentDays },
+    earnings: {
+      basic: baseSalary,
+      house: houseAllowance,
+      medical: medicalAllowance,
+      transport: transportAllowance,
+      total: gross,
+    },
+    deductions: {
+      late: lateDeduction,
+      absent: absentDeduction,
+      tax: taxDeduction,
+      total: deductionsTotal,
+    },
+    netPay: net,
+    status: 'Draft',
+    exceptions,
+  };
+};
+
 export const useDataStore = create(
   persist(
     (set, get) => ({
@@ -630,35 +1024,109 @@ export const useDataStore = create(
       resignations: initialResignations,
       exEmployees: initialExEmployees,
       announcements: initialAnnouncements,
+      bulkIncrements: initialBulkIncrements,
+      profileUpdateRequests: initialProfileRequests,
+      candidates: initialCandidates,
+      documents: initialDocuments,
+      payrollSettings: initialPayrollSettings,
+      payrollRuns: initialPayrollRuns,
+      attendanceCorrections: initialAttendanceCorrections,
+      performanceReviews: initialPerformanceReviews,
+      candidates: initialCandidates,
+      documents: initialDocuments,
 
       // Employee actions
-      addEmployee: (emp) => {
-        // Calculate probation end date if employee is on probation
-        const probationEndDate =
-          emp.employmentStatus === 'probation' && emp.joinDate
-            ? calculateProbationEndDate(emp.joinDate)
-            : null;
+      addEmployee: (emp) =>
+        set((s) => {
+          const joinDate = emp.joinDate || format(today, 'yyyy-MM-dd');
+          const probationEndDate =
+            emp.employmentStatus === 'probation' && joinDate
+              ? calculateProbationEndDate(joinDate)
+              : null;
+          const baseSalary = parseInt(emp.salaryBase, 10) || 0;
+          const employeeId = generateId('e');
+          const code = emp.code || `EMP${String(s.employees.length + 1).padStart(3, '0')}`;
 
-        return set((s) => ({
-          employees: [
-            ...s.employees,
-            {
-              ...emp,
-              id: generateId('e'),
-              code: `EMP${String(s.employees.length + 1).padStart(3, '0')}`,
-              status: 'Active',
-              leaveBalance: { annual: 20, sick: 12, casual: 10, medical: 30 },
-              probationEndDate,
-              gender: emp.gender || 'male',
-              employmentStatus: emp.employmentStatus || 'confirmed',
+          const skeleton = {
+            ...emp,
+            id: employeeId,
+            code,
+            status: 'Active',
+            leaveBalance: { annual: 20, sick: 12, casual: 10, medical: 30 },
+            probationEndDate,
+            gender: emp.gender || 'male',
+            employmentStatus: emp.employmentStatus || 'confirmed',
+            salaryBase: baseSalary,
+            salaryHistory: [],
+            lifecycle: [],
+            contract: {
+              status: 'active',
+              startDate: joinDate,
+              endDate: emp.contractEndDate || null,
+              renewals: [],
             },
-          ],
-        }));
-      },
+            version: 1,
+            lastUpdated: joinDate,
+          };
+
+          const withLifecycle = appendLifecycleEvent(skeleton, {
+            type: 'joining',
+            title: 'Joining',
+            effectiveDate: joinDate,
+            meta: { designation: skeleton.designation, salary: baseSalary },
+            createdAt: joinDate,
+          });
+
+          const withSalary = appendSalaryHistory(
+            { ...withLifecycle, salaryBase: 0 },
+            {
+              amount: baseSalary,
+              type: 'base',
+              reason: 'Joining salary',
+              effectiveDate: joinDate,
+              createdBy: 'HR',
+            },
+          );
+
+          return {
+            employees: [...s.employees, withSalary],
+          };
+        }),
 
       updateEmployee: (id, updates) =>
         set((s) => ({
-          employees: s.employees.map((e) => (e.id === id ? { ...e, ...updates } : e)),
+          employees: s.employees.map((e) => {
+            if (e.id !== id) return e;
+
+            const hasSalaryChange =
+              updates.salaryBase !== undefined && updates.salaryBase !== e.salaryBase;
+
+            if (hasSalaryChange) {
+              const updated = appendSalaryHistory(e, {
+                amount: updates.salaryBase,
+                type: updates.salaryChangeType || 'revision',
+                reason: updates.salaryChangeReason || 'Salary revision',
+                effectiveDate: updates.effectiveDate || format(today, 'yyyy-MM-dd'),
+                reference: updates.reference || null,
+                createdBy: updates.updatedBy || 'HR',
+              });
+
+              return {
+                ...updated,
+                ...updates,
+                salaryChangeType: undefined,
+                salaryChangeReason: undefined,
+                reference: undefined,
+              };
+            }
+
+            return {
+              ...e,
+              ...updates,
+              version: (e.version || 1) + 1,
+              lastUpdated: format(today, 'yyyy-MM-dd'),
+            };
+          }),
         })),
 
       deleteEmployee: (id) =>
@@ -927,9 +1395,125 @@ export const useDataStore = create(
         get().notifications.filter((n) => !n.read && (n.userId === userId || n.userId === 'all'))
           .length,
 
+      // ============ EMAIL NOTIFICATION FRAMEWORK (ARCHITECTURE) ============
+      // This framework is designed for backend integration - frontend structure is ready
+      //
+      // EMAIL NOTIFICATION EVENTS SUPPORTED:
+      // - leave_approved, leave_rejected, leave_forwarded
+      // - attendance_correction_approved, attendance_correction_rejected
+      // - probation_completion (30 days before, 7 days before, on completion)
+      // - contract_expiry_warning (30 days before, 7 days before)
+      // - maternity_leave_milestone (start, midpoint, end)
+      // - promotion_approved, promotion_rejected
+      // - profile_update_approved, profile_update_rejected
+      // - resignation_acknowledgment, resignation_handover_reminder
+      // - selection_board_scheduled, selection_board_outcome
+      //
+      // NOTIFICATION PREFERENCE SCHEMA (to be stored per user):
+      // {
+      //   userId: string,
+      //   preferences: {
+      //     leave_approved: { email: true, inApp: true },
+      //     leave_rejected: { email: true, inApp: true },
+      //     attendance_correction_approved: { email: true, inApp: true },
+      //     probation_completion: { email: true, inApp: true },
+      //     contract_expiry_warning: { email: true, inApp: true },
+      //     ... (all event types)
+      //   }
+      // }
+      //
+      // BACKEND API CONTRACTS:
+      // POST /api/notifications/send
+      // {
+      //   eventType: string (e.g., 'leave_approved'),
+      //   recipientId: string (employee/user ID),
+      //   recipientEmail: string,
+      //   data: {
+      //     leaveId?: string,
+      //     employeeName?: string,
+      //     leaveType?: string,
+      //     startDate?: string,
+      //     endDate?: string,
+      //     reason?: string,
+      //     ... (event-specific data)
+      //   }
+      // }
+      //
+      // RESPONSE:
+      // {
+      //   success: boolean,
+      //   emailId: string (tracking ID for audit),
+      //   sentAt: string (ISO timestamp)
+      // }
+      //
+      // POST /api/notifications/preferences
+      // { userId: string, preferences: object }
+      //
+      // GET /api/notifications/preferences/:userId
+      // Returns: { userId, preferences }
+      //
+      // EMAIL TEMPLATE VARIABLES:
+      // - {{employeeName}}, {{leaveType}}, {{startDate}}, {{endDate}}
+      // - {{approverName}}, {{status}}, {{comments}}, {{actionUrl}}
+      // - All templates should include unsubscribe link and CECOS branding
+      //
+      // IMPLEMENTATION NOTE:
+      // Replace in-app notification calls with dual notifications:
+      // addNotification({ ... }) + sendEmailNotification({ eventType, recipientId, data })
+      //
+      notificationPreferences: {}, // Future: userId -> preferences map
+
+      // Placeholder for email service integration
+      sendEmailNotification: (eventType, recipientId, data) => {
+        // TO BE IMPLEMENTED WITH BACKEND
+        // This function will POST to /api/notifications/send
+        // For now, log the event for debugging
+        console.log('[EMAIL NOTIFICATION]', {
+          eventType,
+          recipientId,
+          data,
+          timestamp: new Date().toISOString(),
+        });
+        // Future: return fetch('/api/notifications/send', { method: 'POST', body: JSON.stringify(...) })
+      },
+
+      updateNotificationPreferences: (userId, preferences) => {
+        // TO BE IMPLEMENTED WITH BACKEND
+        // For now, store locally in memory
+        set((s) => ({
+          notificationPreferences: {
+            ...s.notificationPreferences,
+            [userId]: preferences,
+          },
+        }));
+        console.log('[NOTIFICATION PREFERENCES UPDATED]', { userId, preferences });
+        // Future: POST to /api/notifications/preferences
+      },
+
+      getNotificationPreferences: (userId) => {
+        const prefs = get().notificationPreferences[userId];
+        if (prefs) return prefs;
+        // Default preferences: all events enabled for email and in-app
+        return {
+          leave_approved: { email: true, inApp: true },
+          leave_rejected: { email: true, inApp: true },
+          attendance_correction_approved: { email: true, inApp: true },
+          attendance_correction_rejected: { email: true, inApp: true },
+          probation_completion: { email: true, inApp: true },
+          contract_expiry_warning: { email: true, inApp: true },
+          maternity_leave_milestone: { email: true, inApp: true },
+          promotion_approved: { email: true, inApp: true },
+          resignation_acknowledgment: { email: true, inApp: true },
+        };
+      },
+
       // ============ PROMOTION ACTIONS ============
       addPromotion: (promotion) => {
         const employee = get().getEmployee(promotion.employeeId);
+        const effectiveDate = promotion.effectiveDate || format(today, 'yyyy-MM-dd');
+        const proposedSalary =
+          promotion.proposedSalary !== undefined ? promotion.proposedSalary : employee?.salaryBase;
+
         set((s) => ({
           promotions: [
             ...s.promotions,
@@ -940,6 +1524,8 @@ export const useDataStore = create(
               department: employee?.department,
               faculty: employee?.faculty,
               currentDesignation: employee?.designation,
+              effectiveDate,
+              proposedSalary,
               status: 'Pending',
               appliedOn: format(new Date(), 'yyyy-MM-dd'),
               committeeReview: null,
@@ -963,18 +1549,61 @@ export const useDataStore = create(
           ),
         })),
 
-      approvePromotion: (id) => {
+      approvePromotion: (id, meta = {}) => {
         const promotion = get().promotions.find((p) => p.id === id);
         if (promotion) {
+          const employee = get().getEmployee(promotion.employeeId);
+          const effectiveDate =
+            meta.effectiveDate || promotion.effectiveDate || format(today, 'yyyy-MM-dd');
+          const newSalary =
+            meta.newSalary !== undefined
+              ? meta.newSalary
+              : promotion.proposedSalary !== undefined
+                ? promotion.proposedSalary
+                : employee?.salaryBase;
+
           set((s) => ({
-            employees: s.employees.map((e) =>
-              e.id === promotion.employeeId
-                ? { ...e, designation: promotion.requestedDesignation }
-                : e,
-            ),
+            employees: s.employees.map((e) => {
+              if (e.id !== promotion.employeeId) return e;
+
+              const withSalary = appendSalaryHistory(e, {
+                amount: newSalary,
+                type: 'promotion',
+                reason: `Promotion to ${promotion.requestedDesignation}`,
+                effectiveDate,
+                reference: promotion.id,
+                createdBy: meta.decidedBy || 'HR',
+              });
+
+              const withLifecycle = appendLifecycleEvent(withSalary, {
+                type: 'promotion',
+                title: `Promotion to ${promotion.requestedDesignation}`,
+                effectiveDate,
+                meta: {
+                  from: promotion.currentDesignation,
+                  to: promotion.requestedDesignation,
+                  salary: newSalary,
+                },
+                createdAt: effectiveDate,
+              });
+
+              return { ...withLifecycle, designation: promotion.requestedDesignation };
+            }),
             promotions: s.promotions.map((p) =>
               p.id === id
-                ? { ...p, status: 'Approved', approvedOn: format(new Date(), 'yyyy-MM-dd') }
+                ? {
+                    ...p,
+                    status: 'Approved',
+                    approvedOn: format(new Date(), 'yyyy-MM-dd'),
+                    effectiveDate,
+                    approvedSalary: newSalary,
+                    hrDecision: {
+                      type: 'hr',
+                      decidedBy: meta.decidedBy || 'HR',
+                      date: format(new Date(), 'yyyy-MM-dd'),
+                      notes: meta.notes || null,
+                    },
+                  }
                 : p,
             ),
           }));
@@ -986,6 +1615,748 @@ export const useDataStore = create(
 
       getPendingPromotions: () =>
         get().promotions.filter((p) => p.status === 'Pending' || p.status === 'Under Review'),
+
+      // ============ SALARY & CONTRACT ACTIONS ============
+      reviseSalary: (employeeId, amount, meta = {}) =>
+        set((s) => ({
+          employees: s.employees.map((e) =>
+            e.id === employeeId
+              ? appendSalaryHistory(e, {
+                  amount,
+                  type: meta.type || 'revision',
+                  reason: meta.reason || 'Salary revision',
+                  effectiveDate: meta.effectiveDate || format(today, 'yyyy-MM-dd'),
+                  reference: meta.reference || null,
+                  createdBy: meta.updatedBy || 'HR',
+                })
+              : e,
+          ),
+        })),
+
+      addLifecycleEntry: (employeeId, event) =>
+        set((s) => ({
+          employees: s.employees.map((e) =>
+            e.id === employeeId
+              ? appendLifecycleEvent(e, {
+                  ...event,
+                  effectiveDate: event.effectiveDate || format(today, 'yyyy-MM-dd'),
+                })
+              : e,
+          ),
+        })),
+
+      renewContract: (employeeId, renewal) =>
+        set((s) => ({
+          employees: s.employees.map((e) => {
+            if (e.id !== employeeId) return e;
+            const renewals = [
+              ...(e.contract?.renewals || []),
+              { ...renewal, id: generateId('ren') },
+            ];
+            const updated = {
+              ...e,
+              contract: {
+                ...(e.contract || {}),
+                status: renewal.status || e.contract?.status || 'active',
+                endDate: renewal.newEndDate || e.contract?.endDate || null,
+                renewals,
+              },
+            };
+
+            return appendLifecycleEvent(updated, {
+              type: 'contract',
+              title: 'Contract Renewal',
+              effectiveDate: renewal.effectiveDate || renewal.newEndDate,
+              meta: {
+                previousEndDate: e.contract?.endDate || null,
+                newEndDate: renewal.newEndDate || null,
+              },
+            });
+          }),
+        })),
+
+      // ============ BULK INCREMENT ACTIONS ============
+      createBulkIncrementBatch: (payload) =>
+        set((s) => {
+          const effectiveDate = payload.effectiveDate || format(today, 'yyyy-MM-dd');
+          const targetEmployees =
+            payload.employeeIds && payload.employeeIds.length > 0
+              ? s.employees.filter((e) => payload.employeeIds.includes(e.id))
+              : s.employees;
+
+          const batchId = generateId('inc');
+          const items = targetEmployees.map((emp) => {
+            const previousSalary = emp.salaryBase || 0;
+            const newSalary =
+              payload.mode === 'percent'
+                ? Math.round(previousSalary * (1 + (payload.value || 0) / 100))
+                : previousSalary + (payload.value || 0);
+
+            return {
+              employeeId: emp.id,
+              employeeName: emp.name,
+              previousSalary,
+              newSalary,
+              status: 'pending',
+            };
+          });
+
+          const audit = [
+            {
+              action: 'created',
+              by: payload.createdBy || 'HR',
+              date: format(new Date(), 'yyyy-MM-dd'),
+              note: payload.note || null,
+            },
+          ];
+
+          return {
+            bulkIncrements: [
+              {
+                id: batchId,
+                code: payload.code || batchId.toUpperCase(),
+                title: payload.title || 'Bulk Increment',
+                type: payload.type || 'Adjustment',
+                mode: payload.mode || 'percent',
+                value: payload.value || 0,
+                effectiveDate,
+                note: payload.note || null,
+                status: 'Pending',
+                items,
+                audit,
+              },
+              ...s.bulkIncrements,
+            ],
+          };
+        }),
+
+      applyBulkIncrementBatch: (batchId, meta = {}) =>
+        set((s) => {
+          const batch = s.bulkIncrements.find((b) => b.id === batchId);
+          if (!batch || batch.status === 'Applied') return {};
+
+          const effectiveDate = batch.effectiveDate || format(today, 'yyyy-MM-dd');
+
+          const employees = s.employees.map((e) => {
+            const item = batch.items.find((i) => i.employeeId === e.id);
+            if (!item) return e;
+
+            const withSalary = appendSalaryHistory(e, {
+              amount: item.newSalary,
+              type: 'increment',
+              reason: `${batch.type} increment`,
+              effectiveDate,
+              reference: batch.id,
+              createdBy: meta.approvedBy || 'HR',
+            });
+
+            return appendLifecycleEvent(withSalary, {
+              type: 'increment',
+              title: `${batch.type} increment`,
+              effectiveDate,
+              meta: {
+                from: item.previousSalary,
+                to: item.newSalary,
+                batch: batch.code,
+              },
+            });
+          });
+
+          const updatedBatch = {
+            ...batch,
+            status: 'Applied',
+            appliedOn: format(new Date(), 'yyyy-MM-dd'),
+            audit: [
+              ...(batch.audit || []),
+              {
+                action: 'applied',
+                by: meta.approvedBy || 'HR',
+                date: format(new Date(), 'yyyy-MM-dd'),
+                note: meta.note || null,
+              },
+            ],
+            items: batch.items.map((i) => ({ ...i, status: 'applied' })),
+          };
+
+          return {
+            employees,
+            bulkIncrements: s.bulkIncrements.map((b) => (b.id === batchId ? updatedBatch : b)),
+          };
+        }),
+
+      // ============ PROFILE UPDATE REQUESTS ============
+      submitProfileUpdateRequest: (employeeId, changes, meta = {}) => {
+        const employee = get().getEmployee(employeeId);
+        const request = {
+          id: generateId('pur'),
+          employeeId,
+          employeeName: employee?.name,
+          department: employee?.department,
+          requestedOn: format(new Date(), 'yyyy-MM-dd'),
+          status: 'Pending',
+          changes,
+          notes: meta.notes || null,
+          requestedBy: meta.requestedBy || employee?.name || 'Employee',
+          audit: [
+            {
+              action: 'submitted',
+              by: meta.requestedBy || employee?.name || 'Employee',
+              date: format(new Date(), 'yyyy-MM-dd'),
+              note: meta.notes || null,
+            },
+          ],
+        };
+
+        set((s) => ({ profileUpdateRequests: [request, ...s.profileUpdateRequests] }));
+      },
+
+      reviewProfileUpdateRequest: (id, decision) =>
+        set((s) => {
+          const request = s.profileUpdateRequests.find((r) => r.id === id);
+          if (!request) return {};
+
+          const status = decision.status;
+          const reviewedOn = format(new Date(), 'yyyy-MM-dd');
+
+          let employees = s.employees;
+
+          if (status === 'Approved') {
+            employees = s.employees.map((e) => {
+              if (e.id !== request.employeeId) return e;
+              const updated = {
+                ...e,
+                ...request.changes,
+                version: (e.version || 1) + 1,
+                lastUpdated: reviewedOn,
+              };
+
+              return appendLifecycleEvent(updated, {
+                type: 'profile-update',
+                title: 'Profile Updated',
+                effectiveDate: reviewedOn,
+                meta: { fields: Object.keys(request.changes || {}) },
+              });
+            });
+          }
+
+          const profileUpdateRequests = s.profileUpdateRequests.map((r) =>
+            r.id === id
+              ? {
+                  ...r,
+                  status,
+                  reviewedOn,
+                  reviewedBy: decision.reviewer || 'HR',
+                  notes: decision.notes || r.notes,
+                  audit: [
+                    ...(r.audit || []),
+                    {
+                      action: status.toLowerCase(),
+                      by: decision.reviewer || 'HR',
+                      date: reviewedOn,
+                      note: decision.notes || null,
+                    },
+                  ],
+                }
+              : r,
+          );
+
+          return { employees, profileUpdateRequests };
+        }),
+
+      // ============ PAYROLL ACTIONS ============
+      getPayrollSettings: () => get().payrollSettings,
+
+      updatePayrollSettings: (updates) =>
+        set((s) => ({ payrollSettings: { ...s.payrollSettings, ...updates } })),
+
+      computePayrollForEmployee: (employeeId, month, year) => {
+        const state = get();
+        const settings = state.payrollSettings || initialPayrollSettings;
+        const start = startOfMonth(new Date(year, month - 1, 1));
+        const end = endOfMonth(start);
+        const monthAttendance = state.attendance.filter((a) => {
+          if (a.employeeId !== employeeId) return false;
+          const date = parseISO(a.date);
+          return date >= start && date <= end;
+        });
+
+        const exceptions = [];
+        const pendingPromotion = state.promotions.find(
+          (p) =>
+            p.employeeId === employeeId && (p.status === 'Pending' || p.status === 'Under Review'),
+        );
+        if (pendingPromotion) {
+          exceptions.push('Promotion pending HR approval');
+        }
+        const pendingProfile = state.profileUpdateRequests.find(
+          (r) => r.employeeId === employeeId && r.status === 'Pending',
+        );
+        if (pendingProfile) {
+          exceptions.push('Profile changes pending HR approval');
+        }
+
+        const employee = state.employees.find((e) => e.id === employeeId);
+        if (!employee) return null;
+
+        return calculatePayrollItem(
+          employee,
+          monthAttendance,
+          {
+            month,
+            year,
+            startDate: format(start, 'yyyy-MM-dd'),
+            endDate: format(end, 'yyyy-MM-dd'),
+          },
+          settings,
+          exceptions,
+        );
+      },
+
+      generatePayrollRun: ({ month, year, createdBy }) =>
+        set((s) => {
+          const settings = s.payrollSettings || initialPayrollSettings;
+          const start = startOfMonth(new Date(year, month - 1, 1));
+          const end = endOfMonth(start);
+
+          const items = s.employees.map((emp) => {
+            const monthAttendance = s.attendance.filter((a) => {
+              if (a.employeeId !== emp.id) return false;
+              const date = parseISO(a.date);
+              return date >= start && date <= end;
+            });
+
+            const exceptions = [];
+            const pendingPromotion = s.promotions.find(
+              (p) =>
+                p.employeeId === emp.id && (p.status === 'Pending' || p.status === 'Under Review'),
+            );
+            if (pendingPromotion) {
+              exceptions.push('Promotion pending HR approval');
+            }
+            const pendingProfile = s.profileUpdateRequests.find(
+              (r) => r.employeeId === emp.id && r.status === 'Pending',
+            );
+            if (pendingProfile) {
+              exceptions.push('Profile changes pending HR approval');
+            }
+
+            return calculatePayrollItem(
+              emp,
+              monthAttendance,
+              {
+                month,
+                year,
+                startDate: format(start, 'yyyy-MM-dd'),
+                endDate: format(end, 'yyyy-MM-dd'),
+              },
+              settings,
+              exceptions,
+            );
+          });
+
+          const summary = items.reduce(
+            (acc, item) => {
+              acc.totalGross += item.earnings.total;
+              acc.totalDeductions += item.deductions.total;
+              acc.totalNet += item.netPay;
+              acc.exceptions += item.exceptions?.length ? 1 : 0;
+              return acc;
+            },
+            { totalGross: 0, totalDeductions: 0, totalNet: 0, exceptions: 0 },
+          );
+
+          const run = {
+            id: generateId('pay'),
+            period: {
+              month,
+              year,
+              label: format(start, 'MMM yyyy'),
+              startDate: format(start, 'yyyy-MM-dd'),
+              endDate: format(end, 'yyyy-MM-dd'),
+            },
+            status: 'Draft',
+            createdAt: format(new Date(), 'yyyy-MM-dd HH:mm'),
+            createdBy: createdBy || 'HR',
+            approvals: [],
+            postedOn: null,
+            items,
+            summary,
+          };
+
+          return { payrollRuns: [run, ...s.payrollRuns] };
+        }),
+
+      updatePayrollRunStatus: (id, status, meta = {}) =>
+        set((s) => ({
+          payrollRuns: s.payrollRuns.map((run) =>
+            run.id === id
+              ? {
+                  ...run,
+                  status,
+                  approvals:
+                    status === 'Approved'
+                      ? [
+                          ...(run.approvals || []),
+                          { by: meta.by || 'HR', date: format(new Date(), 'yyyy-MM-dd') },
+                        ]
+                      : run.approvals,
+                }
+              : run,
+          ),
+        })),
+
+      postPayrollRun: (id, meta = {}) =>
+        set((s) => ({
+          payrollRuns: s.payrollRuns.map((run) =>
+            run.id === id
+              ? {
+                  ...run,
+                  status: 'Posted',
+                  postedOn: format(new Date(), 'yyyy-MM-dd'),
+                  postedBy: meta.postedBy || 'HR',
+                  items: run.items.map((item) => ({ ...item, status: 'Posted' })),
+                }
+              : run,
+          ),
+        })),
+
+      getPayrollRunForPeriod: (month, year) => {
+        const state = get();
+        return state.payrollRuns.find(
+          (run) =>
+            run.period?.month === month && run.period?.year === year && run.status === 'Posted',
+        );
+      },
+
+      getEmployeePayrollHistory: (employeeId) => {
+        const state = get();
+        const items = state.payrollRuns
+          .filter((run) => run.status === 'Posted')
+          .map((run) => {
+            const item = run.items.find((i) => i.employeeId === employeeId);
+            return item
+              ? {
+                  ...item,
+                  periodLabel: run.period?.label,
+                  status: run.status,
+                }
+              : null;
+          })
+          .filter(Boolean);
+
+        return items.sort(
+          (a, b) => new Date(b.period?.endDate || 0) - new Date(a.period?.endDate || 0),
+        );
+      },
+
+      // ============ ATTENDANCE CORRECTION ACTIONS ============
+      submitAttendanceCorrection: (employeeId, corrections, meta = {}) =>
+        set((s) => {
+          const employee = s.employees.find((e) => e.id === employeeId);
+          const correction = {
+            id: generateId('atc'),
+            employeeId,
+            employeeName: employee?.name,
+            department: employee?.department,
+            originalAttendance: corrections.originalAttendance,
+            requestedChange: corrections.requestedChange,
+            reason: corrections.reason,
+            documents: corrections.documents || [],
+            submittedOn: format(new Date(), 'yyyy-MM-dd'),
+            status: 'Pending',
+            submittedBy: meta.submittedBy || employee?.name,
+            notes: meta.notes || null,
+            audit: [
+              {
+                action: 'submitted',
+                by: meta.submittedBy || employee?.name,
+                date: format(new Date(), 'yyyy-MM-dd'),
+                comment: meta.notes || null,
+              },
+            ],
+          };
+          return { attendanceCorrections: [correction, ...s.attendanceCorrections] };
+        }),
+
+      reviewAttendanceCorrection: (id, decision) =>
+        set((s) => {
+          const correction = s.attendanceCorrections.find((c) => c.id === id);
+          if (!correction) return {};
+
+          let attendance = s.attendance;
+          if (decision.status === 'Approved') {
+            const att = s.attendance.find(
+              (a) =>
+                a.employeeId === correction.employeeId &&
+                a.date === correction.originalAttendance.date,
+            );
+            if (att) {
+              attendance = s.attendance.map((a) =>
+                a.id === att.id
+                  ? {
+                      ...a,
+                      status: correction.requestedChange.status,
+                      notes: `[Corrected] ${correction.requestedChange.reason || ''}`,
+                      correctionId: id,
+                    }
+                  : a,
+              );
+            }
+          }
+
+          return {
+            attendance,
+            attendanceCorrections: s.attendanceCorrections.map((c) =>
+              c.id === id
+                ? {
+                    ...c,
+                    status: decision.status,
+                    reviewedOn: format(new Date(), 'yyyy-MM-dd'),
+                    reviewedBy: decision.reviewer || 'HR',
+                    audit: [
+                      ...(c.audit || []),
+                      {
+                        action: decision.status.toLowerCase(),
+                        by: decision.reviewer || 'HR',
+                        date: format(new Date(), 'yyyy-MM-dd'),
+                        comment: decision.notes || null,
+                      },
+                    ],
+                  }
+                : c,
+            ),
+          };
+        }),
+
+      flagAttendanceAnomalies: (employeeId) => {
+        const state = get();
+        const employee = state.employees.find((e) => e.id === employeeId);
+        if (!employee) return { anomalies: [], employee: null };
+
+        const empAttendance = state.attendance.filter((a) => a.employeeId === employeeId);
+        const anomalies = [];
+
+        const lastWeekStart = subDays(new Date(), 7);
+        const lastWeekLates = empAttendance.filter(
+          (a) => a.status === 'Late' && parseISO(a.date) >= lastWeekStart,
+        );
+        if (lastWeekLates.length > 3) {
+          anomalies.push({
+            type: 'excessive_lates',
+            severity: 'warning',
+            message: `${lastWeekLates.length} late arrivals in past week`,
+            count: lastWeekLates.length,
+          });
+        }
+
+        let consecutiveAbsent = 0;
+        empAttendance
+          .slice()
+          .reverse()
+          .forEach((a) => {
+            if (a.status === 'Absent') {
+              consecutiveAbsent++;
+              if (consecutiveAbsent > 2) {
+                anomalies.push({
+                  type: 'consecutive_absences',
+                  severity: 'error',
+                  message: `${consecutiveAbsent} consecutive absences detected`,
+                  count: consecutiveAbsent,
+                });
+              }
+            } else {
+              consecutiveAbsent = 0;
+            }
+          });
+
+        const unapprovedLeaves = state.leaves.filter(
+          (l) => l.employeeId === employeeId && l.status === 'Pending',
+        );
+        if (unapprovedLeaves.length > 0) {
+          anomalies.push({
+            type: 'pending_leave_approvals',
+            severity: 'info',
+            message: `${unapprovedLeaves.length} pending leave approvals`,
+            count: unapprovedLeaves.length,
+          });
+        }
+
+        return { anomalies, employee };
+      },
+
+      getLeaveRecommendations: (leaveRequest) => {
+        const state = get();
+        const employee = state.employees.find((e) => e.id === leaveRequest.employeeId);
+        if (!employee)
+          return {
+            recommendation: 'Cannot process',
+            reason: 'Employee not found',
+            recommendations: [],
+          };
+
+        const recommendations = [];
+        const leaveType = leaveRequest.type;
+        const balance = employee.leaveBalance?.[leaveType] || 0;
+
+        if (balance < leaveRequest.days) {
+          recommendations.push({
+            type: 'insufficient_balance',
+            severity: 'error',
+            message: `Insufficient ${leaveType} leave balance (requested: ${leaveRequest.days}, available: ${balance})`,
+          });
+        }
+
+        const approvedLeaves = state.leaves.filter(
+          (l) =>
+            l.employeeId === leaveRequest.employeeId &&
+            l.status === 'Approved' &&
+            parseISO(l.startDate) <= parseISO(leaveRequest.endDate) &&
+            parseISO(l.endDate) >= parseISO(leaveRequest.startDate),
+        );
+        if (approvedLeaves.length > 0) {
+          recommendations.push({
+            type: 'date_overlap',
+            severity: 'warning',
+            message: `Leave dates overlap with ${approvedLeaves.length} existing approved leave(s)`,
+          });
+        }
+
+        const daysInAdvance = differenceInDays(parseISO(leaveRequest.startDate), new Date());
+        if (leaveType !== 'sick' && daysInAdvance < 3) {
+          recommendations.push({
+            type: 'insufficient_notice',
+            severity: 'warning',
+            message: `Leave requested with only ${daysInAdvance} days advance notice (minimum 3 required)`,
+          });
+        }
+
+        return {
+          recommendation: recommendations.length === 0 ? 'Approve' : 'Review',
+          recommendations,
+          leaveBalance: balance,
+          daysInAdvance,
+        };
+      },
+
+      // ============ ATS ACTIONS ============
+      addCandidate: (candidate) =>
+        set((s) => ({
+          candidates: [
+            {
+              ...candidate,
+              id: generateId('cand'),
+              appliedOn: candidate.appliedOn || format(new Date(), 'yyyy-MM-dd'),
+              stage: candidate.stage || 'applied',
+              status: candidate.status || 'In Progress',
+              evaluations: candidate.evaluations || [],
+              documents: candidate.documents || [],
+              selectionBoard: {
+                status: 'pending',
+                members: selectionBoardWorkflow.defaultMembers,
+                approvals: [],
+                checklist: selectionBoardWorkflow.checklist,
+                ...(candidate.selectionBoard || {}),
+              },
+            },
+            ...s.candidates,
+          ],
+        })),
+
+      updateCandidateStage: (id, stage, meta = {}) =>
+        set((s) => ({
+          candidates: s.candidates.map((c) =>
+            c.id === id
+              ? {
+                  ...c,
+                  stage,
+                  status: stage === 'hired' ? 'Hired' : c.status,
+                  stageUpdatedOn: format(new Date(), 'yyyy-MM-dd'),
+                  ...meta,
+                }
+              : c,
+          ),
+        })),
+
+      addCandidateEvaluation: (id, evaluation) =>
+        set((s) => ({
+          candidates: s.candidates.map((c) =>
+            c.id === id
+              ? {
+                  ...c,
+                  evaluations: [
+                    ...c.evaluations,
+                    {
+                      ...evaluation,
+                      date: evaluation.date || format(new Date(), 'yyyy-MM-dd'),
+                    },
+                  ],
+                }
+              : c,
+          ),
+        })),
+
+      addSelectionBoardApproval: (id, approval) =>
+        set((s) => ({
+          candidates: s.candidates.map((c) => {
+            if (c.id !== id) return c;
+            const approvals = [
+              ...(c.selectionBoard?.approvals || []),
+              { ...approval, date: approval.date || format(new Date(), 'yyyy-MM-dd') },
+            ];
+            const approvedCount = approvals.filter((a) => a.decision === 'approved').length;
+            const status =
+              approvedCount >= (selectionBoardWorkflow.requiredApprovals || 2)
+                ? 'approved'
+                : 'pending';
+            return {
+              ...c,
+              selectionBoard: {
+                ...(c.selectionBoard || {}),
+                approvals,
+                status,
+              },
+            };
+          }),
+        })),
+
+      linkCandidateDocument: (id, document) =>
+        set((s) => ({
+          candidates: s.candidates.map((c) =>
+            c.id === id
+              ? {
+                  ...c,
+                  documents: [...(c.documents || []), document],
+                }
+              : c,
+          ),
+        })),
+
+      // ============ DOCUMENT REPOSITORY ACTIONS ============
+      addDocument: (doc) =>
+        set((s) => ({
+          documents: [
+            {
+              ...doc,
+              id: generateId('doc'),
+              version: doc.version || 1,
+              lastUpdated: doc.lastUpdated || format(new Date(), 'yyyy-MM-dd'),
+            },
+            ...s.documents,
+          ],
+        })),
+
+      updateDocument: (id, updates) =>
+        set((s) => ({
+          documents: s.documents.map((d) =>
+            d.id === id
+              ? {
+                  ...d,
+                  ...updates,
+                  lastUpdated: updates.lastUpdated || format(new Date(), 'yyyy-MM-dd'),
+                }
+              : d,
+          ),
+        })),
 
       // ============ RESIGNATION ACTIONS ============
       addResignation: (resignation) => {
@@ -1003,6 +2374,8 @@ export const useDataStore = create(
               status: 'Pending',
               appliedOn: format(new Date(), 'yyyy-MM-dd'),
               exitSurvey: null,
+              exitInterview: null,
+              exitDocuments: [],
               hrApproval: null,
               handoverStatus: 'pending',
             },
@@ -1020,6 +2393,33 @@ export const useDataStore = create(
           resignations: s.resignations.map((r) =>
             r.id === resignationId
               ? { ...r, exitSurvey: survey, exitSurveyDate: format(new Date(), 'yyyy-MM-dd') }
+              : r,
+          ),
+        })),
+
+      addExitInterview: (resignationId, interview) =>
+        set((s) => ({
+          resignations: s.resignations.map((r) =>
+            r.id === resignationId
+              ? {
+                  ...r,
+                  exitInterview: {
+                    ...interview,
+                    date: interview.date || format(new Date(), 'yyyy-MM-dd'),
+                  },
+                }
+              : r,
+          ),
+        })),
+
+      attachExitDocument: (resignationId, doc) =>
+        set((s) => ({
+          resignations: s.resignations.map((r) =>
+            r.id === resignationId
+              ? {
+                  ...r,
+                  exitDocuments: [...(r.exitDocuments || []), doc],
+                }
               : r,
           ),
         })),
@@ -1048,6 +2448,8 @@ export const useDataStore = create(
                       (365.25 * 24 * 60 * 60 * 1000),
                   ),
                   exitReason: resignation.reason,
+                  exitInterview: resignation.exitInterview,
+                  exitDocuments: resignation.exitDocuments,
                   exitSurvey: resignation.exitSurvey,
                 },
               ],
@@ -1067,6 +2469,214 @@ export const useDataStore = create(
 
       getPendingResignations: () =>
         get().resignations.filter((r) => r.status === 'Pending' || r.status === 'Approved'),
+
+      // ============ PERFORMANCE (PAMS) ACTIONS & ANALYTICS ============
+      addPerformanceReview: (review) =>
+        set((s) => ({
+          performanceReviews: [
+            {
+              ...review,
+              id: generateId('prv'),
+              date: review.date || format(new Date(), 'yyyy-MM-dd'),
+            },
+            ...s.performanceReviews,
+          ],
+        })),
+
+      updatePerformanceReview: (id, updates) =>
+        set((s) => ({
+          performanceReviews: s.performanceReviews.map((r) =>
+            r.id === id ? { ...r, ...updates } : r,
+          ),
+        })),
+
+      getPerformanceAnalytics: (scope = {}) => {
+        const state = get();
+        const filtered = state.performanceReviews.filter((r) => {
+          const emp = state.employees.find((e) => e.id === r.employeeId);
+          if (!emp) return false;
+          if (scope.faculty && emp.faculty !== scope.faculty) return false;
+          if (scope.department && emp.department !== scope.department) return false;
+          return true;
+        });
+
+        const byDepartment = {};
+        filtered.forEach((r) => {
+          const emp = state.employees.find((e) => e.id === r.employeeId);
+          const dept = emp?.department || 'Unknown';
+          if (!byDepartment[dept]) byDepartment[dept] = { count: 0, total: 0 };
+          byDepartment[dept].count += 1;
+          byDepartment[dept].total += r.rating || 0;
+        });
+
+        const avgByDepartment = Object.entries(byDepartment).map(([dept, v]) => ({
+          department: dept,
+          averageRating: v.count ? +(v.total / v.count).toFixed(2) : 0,
+          count: v.count,
+        }));
+
+        const overallAvg = filtered.length
+          ? +(filtered.reduce((a, r) => a + (r.rating || 0), 0) / filtered.length).toFixed(2)
+          : 0;
+
+        const topPerformers = filtered
+          .slice()
+          .sort((a, b) => (b.rating || 0) - (a.rating || 0))
+          .slice(0, 5)
+          .map((r) => {
+            const emp = state.employees.find((e) => e.id === r.employeeId);
+            return {
+              employeeId: r.employeeId,
+              name: emp?.name,
+              department: emp?.department,
+              rating: r.rating,
+            };
+          });
+
+        return { overallAvg, avgByDepartment, topPerformers, count: filtered.length };
+      },
+
+      // ============ OPERATIONAL ANALYTICS ============
+      getOvertimeStats: ({
+        month = new Date().getMonth() + 1,
+        year = new Date().getFullYear(),
+      } = {}) => {
+        const state = get();
+        const start = startOfMonth(new Date(year, month - 1, 1));
+        const end = endOfMonth(start);
+        const byEmployee = {};
+
+        state.attendance.forEach((a) => {
+          const d = parseISO(a.date);
+          if (d < start || d > end) return;
+          if (!byEmployee[a.employeeId]) byEmployee[a.employeeId] = 0;
+          const hours = a.workHours || 0;
+          const overtime = Math.max(0, hours - 8);
+          byEmployee[a.employeeId] += overtime;
+        });
+
+        const rows = Object.entries(byEmployee)
+          .map(([employeeId, hours]) => {
+            const emp = state.employees.find((e) => e.id === employeeId);
+            return {
+              employeeId,
+              name: emp?.name,
+              department: emp?.department,
+              hours: +hours.toFixed(2),
+            };
+          })
+          .filter((r) => r.hours > 0)
+          .sort((a, b) => b.hours - a.hours);
+
+        const totalHours = +rows.reduce((sum, r) => sum + r.hours, 0).toFixed(2);
+        return { totalHours, rows };
+      },
+
+      getPendingApprovalsSummary: () => {
+        const s = get();
+        return {
+          leaves: s.leaves.filter((l) => l.status === 'Pending' || l.status === 'Forwarded').length,
+          attendanceCorrections: s.attendanceCorrections.filter((c) => c.status === 'Pending')
+            .length,
+          promotions: s.promotions.filter(
+            (p) => p.status === 'Pending' || p.status === 'Under Review',
+          ).length,
+          profileUpdates: s.profileUpdateRequests.filter((r) => r.status === 'Pending').length,
+          selectionBoard: s.candidates.filter((c) => c.selectionBoard?.status === 'pending').length,
+        };
+      },
+
+      getExpiringContracts: (days = 30) => {
+        const state = get();
+        const now = new Date();
+        const horizon = addDays(now, days);
+        const expiring = state.employees
+          .map((e) => {
+            const probation = e.employmentStatus === 'probation' ? e.probationEndDate : null;
+            const contractEnd = e.contract?.endDate || null;
+            const probationDue = probation && parseISO(probation) <= horizon;
+            const contractDue = contractEnd && parseISO(contractEnd) <= horizon;
+            if (!probationDue && !contractDue) return null;
+            return {
+              id: e.id,
+              name: e.name,
+              department: e.department,
+              faculty: e.faculty,
+              type: probationDue ? 'Probation End' : 'Contract End',
+              dueDate: probationDue ? probation : contractEnd,
+            };
+          })
+          .filter(Boolean)
+          .sort((a, b) => parseISO(a.dueDate) - parseISO(b.dueDate));
+        return expiring;
+      },
+
+      getProfileCompletion: (employeeId) => {
+        const e = get().employees.find((x) => x.id === employeeId);
+        if (!e) return { percent: 0, missing: [] };
+
+        // Core required fields
+        const required = [
+          'email',
+          'phone',
+          'cnic',
+          'bankAccount',
+          'address',
+          'emergencyContact',
+          'department',
+          'faculty',
+          'designation',
+        ];
+        const missing = required.filter((k) => !e[k]);
+        const baseScore = ((required.length - missing.length) / required.length) * 100;
+
+        // Bonus/optional fields that enhance profile completeness (5 points each)
+        const bonusFields = [
+          'dependents',
+          'qualifications',
+          'publications',
+          'certifications',
+          'awards',
+          'skills',
+          'languages',
+          'professionalMemberships',
+        ];
+        const extraScore = bonusFields.reduce((acc, k) => {
+          if (k === 'skills' || k === 'languages') {
+            // For array fields, check if array exists and has items
+            return acc + (e[k] && e[k].length > 0 ? 3 : 0);
+          }
+          return acc + (e[k] && e[k].length > 0 ? 5 : 0);
+        }, 0);
+
+        const percent = Math.min(100, Math.round(baseScore + extraScore));
+        return { percent, missing, bonusFields };
+      },
+
+      getAccreditationReport: () => {
+        const s = get();
+        const genderDist = { male: 0, female: 0, other: 0 };
+        const byDesignation = {};
+        const byFaculty = {};
+        s.employees.forEach((e) => {
+          const g = (e.gender || '').toLowerCase();
+          if (g === 'male') genderDist.male += 1;
+          else if (g === 'female') genderDist.female += 1;
+          else genderDist.other += 1;
+          byDesignation[e.designation] = (byDesignation[e.designation] || 0) + 1;
+          byFaculty[e.faculty] = (byFaculty[e.faculty] || 0) + 1;
+        });
+
+        // Regulatory-ready summary
+        return {
+          headcount: s.employees.length,
+          genderDist,
+          byDesignation,
+          byFaculty,
+          probationCount: s.employees.filter((e) => e.employmentStatus === 'probation').length,
+          contractExpiring30: get().getExpiringContracts(30).length,
+        };
+      },
 
       // ============ EX-EMPLOYEES ACTIONS ============
       getExEmployeesByDepartment: (dept) => get().exEmployees.filter((a) => a.department === dept),
@@ -1156,6 +2766,14 @@ export const useDataStore = create(
           resignations: initialResignations,
           exEmployees: initialExEmployees,
           announcements: initialAnnouncements,
+          bulkIncrements: initialBulkIncrements,
+          profileUpdateRequests: initialProfileRequests,
+          candidates: initialCandidates,
+          documents: initialDocuments,
+          payrollSettings: initialPayrollSettings,
+          payrollRuns: initialPayrollRuns,
+          attendanceCorrections: initialAttendanceCorrections,
+          performanceReviews: initialPerformanceReviews,
         }),
     }),
     {
@@ -1169,6 +2787,14 @@ export const useDataStore = create(
         resignations: state.resignations,
         exEmployees: state.exEmployees,
         announcements: state.announcements,
+        bulkIncrements: state.bulkIncrements,
+        profileUpdateRequests: state.profileUpdateRequests,
+        candidates: state.candidates,
+        documents: state.documents,
+        payrollSettings: state.payrollSettings,
+        payrollRuns: state.payrollRuns,
+        attendanceCorrections: state.attendanceCorrections,
+        performanceReviews: state.performanceReviews,
       }),
     },
   ),

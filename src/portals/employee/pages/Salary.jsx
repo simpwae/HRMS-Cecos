@@ -19,7 +19,8 @@ import {
 
 export default function Salary() {
   const user = useAuthStore((s) => s.user);
-  const { employees, attendance } = useDataStore();
+  const { employees, attendance, payrollRuns, payrollSettings, computePayrollForEmployee } =
+    useDataStore();
 
   const employee = useMemo(
     () => employees.find((e) => e.id === user?.id || e.email === user?.email),
@@ -29,7 +30,39 @@ export default function Salary() {
 
   const [selectedMonth, setSelectedMonth] = useState(new Date());
 
-  // Get attendance for selected month
+  const periodMonth = selectedMonth.getMonth() + 1;
+  const periodYear = selectedMonth.getFullYear();
+
+  const formatCurrency = (amount) =>
+    new Intl.NumberFormat('en-PK', {
+      style: 'currency',
+      currency: 'PKR',
+      minimumFractionDigits: 0,
+    }).format(amount || 0);
+
+  const payrollItem = useMemo(() => {
+    const postedRun = payrollRuns.find(
+      (run) =>
+        run.period?.month === periodMonth &&
+        run.period?.year === periodYear &&
+        run.status === 'Posted',
+    );
+    const runItem = postedRun?.items?.find((i) => i.employeeId === employeeId);
+
+    if (runItem) {
+      return { ...runItem, runStatus: postedRun.status };
+    }
+
+    if (computePayrollForEmployee && employeeId) {
+      const computed = computePayrollForEmployee(employeeId, periodMonth, periodYear);
+      if (computed) {
+        return { ...computed, runStatus: 'Draft' };
+      }
+    }
+
+    return null;
+  }, [computePayrollForEmployee, employeeId, payrollRuns, periodMonth, periodYear]);
+
   const monthAttendance = useMemo(() => {
     const monthStart = startOfMonth(selectedMonth);
     const monthEnd = endOfMonth(selectedMonth);
@@ -41,38 +74,47 @@ export default function Salary() {
     });
   }, [attendance, employeeId, selectedMonth]);
 
-  // Salary calculation
-  const baseSalary = employee?.salaryBase || 0;
-  const presentDays = monthAttendance.filter((a) => a.status === 'Present').length;
-  const lateDays = monthAttendance.filter((a) => a.status === 'Late').length;
-  const absentDays = monthAttendance.filter((a) => a.status === 'Absent').length;
-  const workingDays = 22; // Standard working days
+  const baseSalary = payrollItem?.baseSalary || employee?.salaryBase || 0;
+  const presentDays =
+    payrollItem?.attendance?.present ??
+    monthAttendance.filter((a) => a.status === 'Present').length;
+  const lateDays =
+    payrollItem?.attendance?.late ?? monthAttendance.filter((a) => a.status === 'Late').length;
+  const absentDays =
+    payrollItem?.attendance?.absent ?? monthAttendance.filter((a) => a.status === 'Absent').length;
 
-  // Deductions
-  const lateDeduction = lateDays * 500; // PKR 500 per late
-  const absentDeduction = absentDays * Math.round(baseSalary / workingDays);
-  const taxDeduction = baseSalary > 100000 ? Math.round(baseSalary * 0.05) : 0; // 5% tax if above 100k
-  const totalDeductions = lateDeduction + absentDeduction + taxDeduction;
-
-  // Allowances
-  const houseAllowance = Math.round(baseSalary * 0.45);
-  const medicalAllowance = Math.round(baseSalary * 0.1);
-  const transportAllowance = 5000;
+  const houseAllowance = payrollItem?.earnings?.house || 0;
+  const medicalAllowance = payrollItem?.earnings?.medical || 0;
+  const transportAllowance = payrollItem?.earnings?.transport || 0;
   const totalAllowances = houseAllowance + medicalAllowance + transportAllowance;
+  const grossSalary = payrollItem?.earnings?.total || baseSalary + totalAllowances;
+  const lateDeduction = payrollItem?.deductions?.late || 0;
+  const absentDeduction = payrollItem?.deductions?.absent || 0;
+  const taxDeduction = payrollItem?.deductions?.tax || 0;
+  const totalDeductions =
+    payrollItem?.deductions?.total || lateDeduction + absentDeduction + taxDeduction;
+  const netSalary = payrollItem?.netPay || grossSalary - totalDeductions;
 
-  // Net calculations
-  const grossSalary = baseSalary + totalAllowances;
-  const netSalary = grossSalary - totalDeductions;
-
-  const formatCurrency = (amount) =>
-    new Intl.NumberFormat('en-PK', {
-      style: 'currency',
-      currency: 'PKR',
-      minimumFractionDigits: 0,
-    }).format(amount);
-
-  // Previous months for history
   const salaryHistory = useMemo(() => {
+    const posted = payrollRuns
+      .filter((run) => run.status === 'Posted')
+      .map((run) => {
+        const item = run.items.find((i) => i.employeeId === employeeId);
+        return item
+          ? {
+              month: run.period?.label,
+              shortMonth: run.period?.label,
+              gross: item.earnings?.total,
+              deductions: item.deductions?.total,
+              net: item.netPay,
+              status: run.status,
+            }
+          : null;
+      })
+      .filter(Boolean);
+
+    if (posted.length > 0) return posted;
+
     return Array.from({ length: 6 }, (_, i) => {
       const month = subMonths(new Date(), i);
       const monthStart = startOfMonth(month);
@@ -86,9 +128,15 @@ export default function Salary() {
 
       const late = monthAtt.filter((a) => a.status === 'Late').length;
       const absent = monthAtt.filter((a) => a.status === 'Absent').length;
-      const lateDed = late * 500;
-      const absentDed = absent * Math.round(baseSalary / workingDays);
-      const tax = baseSalary > 100000 ? Math.round(baseSalary * 0.05) : 0;
+      const lateDed = late * (payrollSettings?.deductionConfig?.latePenalty || 0);
+      const absentDed = Math.round((baseSalary / (payrollSettings?.workingDays || 22)) * absent);
+      const tax =
+        baseSalary + totalAllowances > (payrollSettings?.deductionConfig?.taxThreshold || 0)
+          ? Math.round(
+              (baseSalary + totalAllowances) *
+                ((payrollSettings?.deductionConfig?.taxRate || 0) / 100),
+            )
+          : 0;
       const gross = baseSalary + totalAllowances;
       const net = gross - (lateDed + absentDed + tax);
 
@@ -98,10 +146,10 @@ export default function Salary() {
         gross,
         deductions: lateDed + absentDed + tax,
         net,
-        status: i === 0 ? 'Processing' : 'Paid',
+        status: i === 0 ? 'Draft' : 'Generated',
       };
     });
-  }, [attendance, employeeId, baseSalary, totalAllowances]);
+  }, [attendance, employeeId, baseSalary, totalAllowances, payrollRuns, payrollSettings]);
 
   const handlePrint = () => {
     window.print();

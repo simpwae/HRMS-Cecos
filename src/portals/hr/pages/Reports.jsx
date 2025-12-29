@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { format, startOfMonth, endOfMonth, parseISO, isWithinInterval, subMonths } from 'date-fns';
 import { useDataStore, faculties, departments } from '../../../state/data';
+import { toCSV, downloadCSV } from '../../../services/export';
 import Card from '../../../components/Card';
 import Button from '../../../components/Button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../../components/Tabs';
@@ -19,6 +20,7 @@ import {
 
 export default function Reports() {
   const { employees, attendance, leaves } = useDataStore();
+  const getAccreditationReport = useDataStore((s) => s.getAccreditationReport);
   const [selectedMonth, setSelectedMonth] = useState(new Date());
 
   // Filters
@@ -194,6 +196,26 @@ export default function Reports() {
   const totalSalaryExpense = filteredEmployees
     .filter((e) => e.status === 'Active')
     .reduce((sum, e) => sum + (e.salaryBase || 0), 0);
+
+  const accreditation = useMemo(() => getAccreditationReport(), [getAccreditationReport]);
+
+  const exportAccreditationCSV = () => {
+    const rows = [];
+    rows.push({ metric: 'Headcount', value: accreditation.headcount });
+    rows.push({ metric: 'Probation Count', value: accreditation.probationCount });
+    rows.push({ metric: 'Contract Expiring (30d)', value: accreditation.contractExpiring30 });
+    rows.push({ metric: 'Gender Male', value: accreditation.genderDist.male });
+    rows.push({ metric: 'Gender Female', value: accreditation.genderDist.female });
+    rows.push({ metric: 'Gender Other', value: accreditation.genderDist.other });
+    Object.entries(accreditation.byFaculty || {}).forEach(([k, v]) =>
+      rows.push({ metric: `Faculty - ${k}`, value: v }),
+    );
+    Object.entries(accreditation.byDesignation || {}).forEach(([k, v]) =>
+      rows.push({ metric: `Designation - ${k}`, value: v }),
+    );
+    const csv = toCSV(rows, ['metric', 'value']);
+    downloadCSV(`accreditation_${format(new Date(), 'yyyyMMdd')}.csv`, csv);
+  };
 
   return (
     <div className="space-y-6">
@@ -376,6 +398,7 @@ export default function Reports() {
           <TabsTrigger value="employees">Employee Report</TabsTrigger>
           <TabsTrigger value="leaves">Leave Report</TabsTrigger>
           <TabsTrigger value="payroll">Payroll Report</TabsTrigger>
+          <TabsTrigger value="accreditation">Accreditation & Regulatory</TabsTrigger>
         </TabsList>
 
         <TabsContent value="attendance">
@@ -628,6 +651,91 @@ export default function Reports() {
               </table>
             </div>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="accreditation">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="font-semibold text-gray-900">Accreditation & Regulatory Summary</h3>
+              <p className="text-sm text-gray-600">Gender, designation, and faculty distribution</p>
+            </div>
+            <Button className="gap-2" onClick={exportAccreditationCSV}>
+              <DocumentArrowDownIcon className="w-5 h-5" />
+              Export CSV
+            </Button>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <Card>
+              <div className="text-center">
+                <p className="text-3xl font-bold text-gray-900">{accreditation.headcount}</p>
+                <p className="text-sm text-gray-500">Total Employees</p>
+              </div>
+            </Card>
+            <Card>
+              <div className="text-center">
+                <p className="text-3xl font-bold text-amber-600">{accreditation.probationCount}</p>
+                <p className="text-sm text-gray-500">On Probation</p>
+              </div>
+            </Card>
+            <Card>
+              <div className="text-center">
+                <p className="text-3xl font-bold text-red-600">
+                  {accreditation.contractExpiring30}
+                </p>
+                <p className="text-sm text-gray-500">Contracts Expiring (30d)</p>
+              </div>
+            </Card>
+            <Card>
+              <div className="text-center">
+                <p className="text-3xl font-bold text-indigo-600">
+                  {accreditation.genderDist.female}
+                </p>
+                <p className="text-sm text-gray-500">Female Employees</p>
+              </div>
+            </Card>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
+            <Card>
+              <h3 className="font-semibold text-gray-900 mb-4">By Faculty</h3>
+              <div className="space-y-3">
+                {Object.entries(accreditation.byFaculty).map(([fac, count]) => (
+                  <div key={fac} className="flex items-center justify-between">
+                    <span className="text-gray-600">{fac}</span>
+                    <div className="flex items-center gap-2">
+                      <div className="w-24 h-2 bg-gray-100 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-indigo-500 rounded-full"
+                          style={{ width: `${(count / (accreditation.headcount || 1)) * 100}%` }}
+                        />
+                      </div>
+                      <span className="font-medium w-8 text-right">{count}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+
+            <Card>
+              <h3 className="font-semibold text-gray-900 mb-4">By Designation</h3>
+              <div className="space-y-3">
+                {Object.entries(accreditation.byDesignation).map(([des, count]) => (
+                  <div key={des} className="flex items-center justify-between">
+                    <span className="text-gray-600">{des}</span>
+                    <div className="flex items-center gap-2">
+                      <div className="w-24 h-2 bg-gray-100 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-purple-500 rounded-full"
+                          style={{ width: `${(count / (accreditation.headcount || 1)) * 100}%` }}
+                        />
+                      </div>
+                      <span className="font-medium w-8 text-right">{count}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          </div>
         </TabsContent>
       </Tabs>
     </div>

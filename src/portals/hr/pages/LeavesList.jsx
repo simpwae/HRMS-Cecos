@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { format, parseISO } from 'date-fns';
+import InputWithIcon from '../../../components/InputWithIcon';
 import { useDataStore, leaveTypes } from '../../../state/data';
 import { useAuthStore } from '../../../state/auth';
 import Card from '../../../components/Card';
@@ -395,14 +396,14 @@ export default function LeavesList() {
       {/* Filters */}
       <Card>
         <div className="flex flex-col md:flex-row gap-4">
-          <div className="flex-1 relative">
-            <MagnifyingGlassIcon className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
+          <div className="flex-1">
+            <InputWithIcon
               type="text"
               placeholder="Search by employee name or department..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+              className="w-full"
+              inputClassName="pr-4 py-2"
             />
           </div>
           <div className="flex items-center gap-2">

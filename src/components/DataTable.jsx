@@ -17,6 +17,7 @@ import {
   ArrowDownTrayIcon,
 } from '@heroicons/react/24/outline';
 import Button from './Button';
+import InputWithIcon from './InputWithIcon';
 
 /**
  * DataTable - Full-featured data table with sorting, filtering, pagination
@@ -69,14 +70,14 @@ export default function DataTable({
       {(showSearch || showExport) && (
         <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
           {showSearch && (
-            <div className="relative flex-1 max-w-sm">
-              <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-              <input
+            <div className="flex-1 max-w-sm">
+              <InputWithIcon
                 type="text"
                 placeholder={searchPlaceholder}
                 value={globalFilter ?? ''}
                 onChange={(e) => setGlobalFilter(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 focus:border-[hsl(var(--color-primary))] focus:ring-2 focus:ring-[hsl(var(--color-primary)/0.1)] transition-all outline-none text-sm"
+                className="w-full"
+                inputClassName="pr-4 py-2 text-sm"
               />
             </div>
           )}

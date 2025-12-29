@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuthStore } from '../../../state/auth';
+import { useDataStore } from '../../../state/data';
 import Card from '../../../components/Card';
 import Button from '../../../components/Button';
 import Badge from '../../../components/Badge';
@@ -17,6 +18,7 @@ import {
 
 export default function Settings() {
   const user = useAuthStore((s) => s.user);
+  const { payrollSettings, updatePayrollSettings } = useDataStore();
 
   // Mock settings state
   const [settings, setSettings] = useState({
@@ -26,6 +28,8 @@ export default function Settings() {
     lateThreshold: 15, // minutes
     halfDayThreshold: 4, // hours
     overtimeStartAfter: 8, // hours
+    overtimeWarningHours: payrollSettings?.operationalConfig?.overtimeWarningHours || 40,
+    expiryHorizonDays: payrollSettings?.operationalConfig?.expiryHorizonDays || 30,
 
     // Leave Settings
     annualLeaveQuota: 20,
@@ -35,11 +39,16 @@ export default function Settings() {
     minAdvanceNotice: 3, // days
 
     // Payroll Settings
-    latePenalty: 500,
-    absentPenalty: 'daily_rate',
-    overtimeRate: 1.5,
-    taxThreshold: 100000,
-    taxRate: 5,
+    workingDays: payrollSettings?.workingDays || 22,
+    latePenalty: payrollSettings?.deductionConfig?.latePenalty || 500,
+    absentPenalty: payrollSettings?.deductionConfig?.absentPenaltyType || 'daily_rate',
+    absentPenaltyValue: payrollSettings?.deductionConfig?.absentPenaltyValue || 0,
+    overtimeRate: payrollSettings?.overtimeRate || 1.5,
+    taxThreshold: payrollSettings?.deductionConfig?.taxThreshold || 100000,
+    taxRate: payrollSettings?.deductionConfig?.taxRate || 5,
+    housePercent: payrollSettings?.allowanceConfig?.housePercent || 45,
+    medicalPercent: payrollSettings?.allowanceConfig?.medicalPercent || 10,
+    transportFixed: payrollSettings?.allowanceConfig?.transportFixed || 5000,
 
     // Notification Settings
     emailNotifications: true,
@@ -54,8 +63,49 @@ export default function Settings() {
   };
 
   const handleSave = () => {
+    updatePayrollSettings({
+      workingDays: settings.workingDays,
+      overtimeRate: settings.overtimeRate,
+      allowanceConfig: {
+        housePercent: settings.housePercent,
+        medicalPercent: settings.medicalPercent,
+        transportFixed: settings.transportFixed,
+      },
+      deductionConfig: {
+        latePenalty: settings.latePenalty,
+        absentPenaltyType: settings.absentPenalty,
+        absentPenaltyValue: settings.absentPenaltyValue,
+        taxThreshold: settings.taxThreshold,
+        taxRate: settings.taxRate,
+      },
+      operationalConfig: {
+        overtimeWarningHours: settings.overtimeWarningHours,
+        expiryHorizonDays: settings.expiryHorizonDays,
+      },
+    });
     alert('Settings saved successfully!');
   };
+
+  useEffect(() => {
+    setSettings((prev) => ({
+      ...prev,
+      workingDays: payrollSettings?.workingDays || prev.workingDays,
+      latePenalty: payrollSettings?.deductionConfig?.latePenalty || prev.latePenalty,
+      absentPenalty: payrollSettings?.deductionConfig?.absentPenaltyType || prev.absentPenalty,
+      absentPenaltyValue:
+        payrollSettings?.deductionConfig?.absentPenaltyValue ?? prev.absentPenaltyValue,
+      overtimeRate: payrollSettings?.overtimeRate || prev.overtimeRate,
+      taxThreshold: payrollSettings?.deductionConfig?.taxThreshold || prev.taxThreshold,
+      taxRate: payrollSettings?.deductionConfig?.taxRate || prev.taxRate,
+      housePercent: payrollSettings?.allowanceConfig?.housePercent || prev.housePercent,
+      medicalPercent: payrollSettings?.allowanceConfig?.medicalPercent || prev.medicalPercent,
+      transportFixed: payrollSettings?.allowanceConfig?.transportFixed || prev.transportFixed,
+      overtimeWarningHours:
+        payrollSettings?.operationalConfig?.overtimeWarningHours ?? prev.overtimeWarningHours,
+      expiryHorizonDays:
+        payrollSettings?.operationalConfig?.expiryHorizonDays ?? prev.expiryHorizonDays,
+    }));
+  }, [payrollSettings]);
 
   return (
     <div className="space-y-6">
@@ -148,6 +198,32 @@ export default function Settings() {
                   className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                 />
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Overtime Warning Threshold (hours/month)
+                </label>
+                <input
+                  type="number"
+                  value={settings.overtimeWarningHours}
+                  onChange={(e) => handleChange('overtimeWarningHours', parseInt(e.target.value))}
+                  className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                />
+                <p className="text-xs text-gray-500 mt-1">Dashboard warning when exceeded</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Expiry Horizon (days)
+                </label>
+                <input
+                  type="number"
+                  value={settings.expiryHorizonDays}
+                  onChange={(e) => handleChange('expiryHorizonDays', parseInt(e.target.value))}
+                  className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Show upcoming probation/contract expiries
+                </p>
+              </div>
             </div>
           </Card>
         </TabsContent>
@@ -228,7 +304,17 @@ export default function Settings() {
               <CurrencyDollarIcon className="w-5 h-5 text-gray-400" />
               Payroll Settings
             </h3>
-            <div className="grid sm:grid-cols-2 gap-6">
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Working Days</label>
+                <input
+                  type="number"
+                  value={settings.workingDays}
+                  onChange={(e) => handleChange('workingDays', parseInt(e.target.value))}
+                  className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                />
+                <p className="text-xs text-gray-500 mt-1">Used for daily-rate calculations</p>
+              </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Late Penalty (PKR)
@@ -250,11 +336,24 @@ export default function Settings() {
                   onChange={(e) => handleChange('absentPenalty', e.target.value)}
                   className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                 >
-                  <option value="daily_rate">Daily Rate (Salary / 22)</option>
+                  <option value="daily_rate">Daily Rate (Salary / working days)</option>
                   <option value="fixed">Fixed Amount</option>
                   <option value="none">No Deduction</option>
                 </select>
               </div>
+              {settings.absentPenalty === 'fixed' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Absent Penalty (PKR)
+                  </label>
+                  <input
+                    type="number"
+                    value={settings.absentPenaltyValue}
+                    onChange={(e) => handleChange('absentPenaltyValue', parseInt(e.target.value))}
+                    className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  />
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Overtime Rate (multiplier)
@@ -267,6 +366,39 @@ export default function Settings() {
                   className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                 />
                 <p className="text-xs text-gray-500 mt-1">1.5 = 150% of hourly rate</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  House Allowance (%)
+                </label>
+                <input
+                  type="number"
+                  value={settings.housePercent}
+                  onChange={(e) => handleChange('housePercent', parseInt(e.target.value))}
+                  className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Medical Allowance (%)
+                </label>
+                <input
+                  type="number"
+                  value={settings.medicalPercent}
+                  onChange={(e) => handleChange('medicalPercent', parseInt(e.target.value))}
+                  className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Transport Allowance (PKR)
+                </label>
+                <input
+                  type="number"
+                  value={settings.transportFixed}
+                  onChange={(e) => handleChange('transportFixed', parseInt(e.target.value))}
+                  className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">

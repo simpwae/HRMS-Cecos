@@ -40,7 +40,12 @@ export default function Promotions() {
     handleSubmit,
     reset,
     formState: { errors, isSubmitting },
-  } = useForm();
+  } = useForm({
+    defaultValues: {
+      effectiveDate: format(new Date(), 'yyyy-MM-dd'),
+      expectedSalary: '',
+    },
+  });
 
   // Get next possible designation
   const nextDesignation = promotionPath[employee?.designation] || null;
@@ -72,6 +77,8 @@ export default function Promotions() {
       achievements: data.achievements,
       qualifications: data.qualifications,
       yearsInService: yearsOfService,
+      effectiveDate: data.effectiveDate,
+      proposedSalary: data.expectedSalary ? parseInt(data.expectedSalary, 10) : undefined,
       documents:
         data.documents
           ?.split(',')
@@ -281,6 +288,27 @@ export default function Promotions() {
               type="text"
               placeholder="e.g., PhD Certificate, Research Papers, Performance Reviews"
               className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </FormField>
+
+          {/* Effective Date */}
+          <FormField label="Effective Date" error={errors.effectiveDate?.message}>
+            <input
+              type="date"
+              {...register('effectiveDate')}
+              className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </FormField>
+
+          {/* Expected Salary */}
+          <FormField label="Expected Salary (PKR)" error={errors.expectedSalary?.message}>
+            <input
+              type="number"
+              min={0}
+              step="1000"
+              {...register('expectedSalary')}
+              className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              placeholder="Optional"
             />
           </FormField>
 

@@ -5,7 +5,10 @@ import { useDataStore } from '../../../state/data';
 import { useAuthStore } from '../../../state/auth';
 import Card from '../../../components/Card';
 import Badge from '../../../components/Badge';
+import Button from '../../../components/Button';
 import StatCard from '../../../components/StatCard';
+import Modal from '../../../components/Modal';
+import FileUpload from '../../../components/FileUpload';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../../components/Tabs';
 import {
   ClockIcon,
@@ -13,12 +16,15 @@ import {
   XCircleIcon,
   ExclamationTriangleIcon,
   CalendarDaysIcon,
+  DocumentTextIcon,
+  PlusIcon,
 } from '@heroicons/react/24/outline';
 import 'react-day-picker/dist/style.css';
 
 export default function Attendance() {
   const user = useAuthStore((s) => s.user);
-  const { employees, attendance } = useDataStore();
+  const { employees, attendance, attendanceCorrections, submitAttendanceCorrection } =
+    useDataStore();
 
   const employee = useMemo(
     () => employees.find((e) => e.id === user?.id || e.email === user?.email),
@@ -28,6 +34,14 @@ export default function Attendance() {
 
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [viewMonth, setViewMonth] = useState(new Date());
+  const [correctionModalOpen, setCorrectionModalOpen] = useState(false);
+  const [correctionForm, setCorrectionForm] = useState({
+    date: '',
+    currentStatus: '',
+    requestedStatus: '',
+    reason: '',
+    documents: [],
+  });
 
   // Get all attendance records for this employee
   const myAttendance = useMemo(
@@ -102,6 +116,61 @@ export default function Attendance() {
     return months;
   }, [myAttendance]);
 
+  // My correction requests
+  const myCorrections = useMemo(
+    () => attendanceCorrections.filter((c) => c.employeeId === employeeId),
+    [attendanceCorrections, employeeId],
+  );
+
+  const handleOpenCorrectionModal = (date, status) => {
+    setCorrectionForm({
+      date: date ? format(date, 'yyyy-MM-dd') : '',
+      currentStatus: status || '',
+      requestedStatus: '',
+      reason: '',
+      documents: [],
+    });
+    setCorrectionModalOpen(true);
+  };
+
+  const handleSubmitCorrection = () => {
+    if (!correctionForm.date || !correctionForm.requestedStatus || !correctionForm.reason) {
+      alert('Please fill all required fields');
+      return;
+    }
+
+    const attendanceRecord = myAttendance.find((a) => a.date === correctionForm.date);
+
+    submitAttendanceCorrection(employeeId, {
+      originalAttendance: {
+        date: correctionForm.date,
+        status: correctionForm.currentStatus || 'Absent',
+        clockIn: attendanceRecord?.clockIn || null,
+        clockOut: attendanceRecord?.clockOut || null,
+      },
+      requestedChange: {
+        status: correctionForm.requestedStatus,
+        reason: correctionForm.reason,
+      },
+      documents: correctionForm.documents,
+    });
+
+    setCorrectionModalOpen(false);
+    setCorrectionForm({
+      date: '',
+      currentStatus: '',
+      requestedStatus: '',
+      reason: '',
+      documents: [],
+    });
+  };
+
+  const getCorrectionStatusColor = (status) => {
+    if (status === 'Approved') return 'success';
+    if (status === 'Rejected') return 'error';
+    return 'warning';
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -148,6 +217,9 @@ export default function Attendance() {
           <TabsTrigger value="calendar">Calendar View</TabsTrigger>
           <TabsTrigger value="history">History</TabsTrigger>
           <TabsTrigger value="monthly">Monthly Report</TabsTrigger>
+          <TabsTrigger value="corrections">
+            Corrections {myCorrections.length > 0 && `(${myCorrections.length})`}
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="calendar">
@@ -390,7 +462,241 @@ export default function Attendance() {
             </div>
           </Card>
         </TabsContent>
+
+        <TabsContent value="corrections">
+          <div className="space-y-6">
+            {/* Request New Correction Button */}
+            <Card>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    Attendance Correction Requests
+                  </h3>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Submit a request to correct your attendance records
+                  </p>
+                </div>
+                <Button
+                  onClick={() => handleOpenCorrectionModal(null, null)}
+                  icon={PlusIcon}
+                  variant="primary"
+                >
+                  Request Correction
+                </Button>
+              </div>
+            </Card>
+
+            {/* Correction Requests List */}
+            {myCorrections.length === 0 ? (
+              <Card>
+                <div className="text-center py-12">
+                  <DocumentTextIcon className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No Correction Requests</h3>
+                  <p className="text-gray-500 mb-4">
+                    You haven't submitted any attendance correction requests yet.
+                  </p>
+                  <Button
+                    onClick={() => handleOpenCorrectionModal(null, null)}
+                    icon={PlusIcon}
+                    variant="primary"
+                  >
+                    Submit Your First Request
+                  </Button>
+                </div>
+              </Card>
+            ) : (
+              <div className="space-y-4">
+                {myCorrections
+                  .sort((a, b) => new Date(b.submittedOn) - new Date(a.submittedOn))
+                  .map((correction) => (
+                    <Card key={correction.id} className="hover:shadow-md transition-shadow">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <CalendarDaysIcon className="w-5 h-5 text-gray-400" />
+                            <span className="font-semibold text-gray-900">
+                              {format(parseISO(correction.originalAttendance.date), 'MMMM d, yyyy')}
+                            </span>
+                            <Badge variant={getCorrectionStatusColor(correction.status)} size="sm">
+                              {correction.status}
+                            </Badge>
+                          </div>
+
+                          <div className="grid sm:grid-cols-2 gap-4 mt-3">
+                            <div className="flex items-center gap-2 text-sm">
+                              <span className="text-gray-500">Original Status:</span>
+                              <Badge
+                                variant={getBadgeVariant(correction.originalAttendance.status)}
+                              >
+                                {correction.originalAttendance.status}
+                              </Badge>
+                            </div>
+                            <div className="flex items-center gap-2 text-sm">
+                              <span className="text-gray-500">Requested Status:</span>
+                              <Badge variant={getBadgeVariant(correction.requestedChange.status)}>
+                                {correction.requestedChange.status}
+                              </Badge>
+                            </div>
+                          </div>
+
+                          <div className="mt-3 bg-gray-50 rounded-lg p-3">
+                            <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">
+                              Reason
+                            </p>
+                            <p className="text-sm text-gray-700">
+                              {correction.requestedChange.reason}
+                            </p>
+                          </div>
+
+                          {correction.documents && correction.documents.length > 0 && (
+                            <div className="mt-3">
+                              <p className="text-xs text-gray-500 uppercase tracking-wide mb-2">
+                                Supporting Documents
+                              </p>
+                              <div className="flex flex-wrap gap-2">
+                                {correction.documents.map((doc, idx) => (
+                                  <span
+                                    key={idx}
+                                    className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-700 rounded text-xs"
+                                  >
+                                    <DocumentTextIcon className="w-3 h-3" />
+                                    {doc.name || `Document ${idx + 1}`}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {correction.notes && (
+                            <div className="mt-3 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                              <p className="text-xs text-yellow-800 uppercase tracking-wide mb-1">
+                                HR Notes
+                              </p>
+                              <p className="text-sm text-yellow-700">{correction.notes}</p>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="text-right text-xs text-gray-500">
+                          <p>Submitted</p>
+                          <p className="font-medium text-gray-700">
+                            {format(parseISO(correction.submittedOn), 'MMM d, yyyy')}
+                          </p>
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+              </div>
+            )}
+          </div>
+        </TabsContent>
       </Tabs>
+
+      {/* Correction Request Modal */}
+      <Modal
+        isOpen={correctionModalOpen}
+        onClose={() => setCorrectionModalOpen(false)}
+        title="Request Attendance Correction"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Date <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="date"
+              value={correctionForm.date}
+              onChange={(e) => setCorrectionForm({ ...correctionForm, date: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              max={format(new Date(), 'yyyy-MM-dd')}
+            />
+          </div>
+
+          {correctionForm.date && (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Current Status
+                </label>
+                <div className="px-3 py-2 bg-gray-50 rounded-lg">
+                  {correctionForm.currentStatus ? (
+                    <Badge variant={getBadgeVariant(correctionForm.currentStatus)}>
+                      {correctionForm.currentStatus}
+                    </Badge>
+                  ) : (
+                    <span className="text-sm text-gray-500">
+                      No record found (Absent or Weekend)
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Requested Status <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={correctionForm.requestedStatus}
+                  onChange={(e) =>
+                    setCorrectionForm({ ...correctionForm, requestedStatus: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Select Status</option>
+                  <option value="Present">Present</option>
+                  <option value="Late">Late</option>
+                  <option value="Absent">Absent</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Reason for Correction <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  value={correctionForm.reason}
+                  onChange={(e) => setCorrectionForm({ ...correctionForm, reason: e.target.value })}
+                  rows={4}
+                  placeholder="Explain why this correction is needed (e.g., forgot to clock in, system error, etc.)"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Supporting Documents (Optional)
+                </label>
+                <FileUpload
+                  onUpload={(files) =>
+                    setCorrectionForm({
+                      ...correctionForm,
+                      documents: files.map((f) => ({ name: f.name, file: f })),
+                    })
+                  }
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  multiple
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Upload any supporting documents (e.g., screenshots, emails)
+                </p>
+              </div>
+            </>
+          )}
+
+          <div className="flex gap-3 pt-4">
+            <Button
+              variant="outline"
+              onClick={() => setCorrectionModalOpen(false)}
+              className="flex-1"
+            >
+              Cancel
+            </Button>
+            <Button variant="primary" onClick={handleSubmitCorrection} className="flex-1">
+              Submit Request
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

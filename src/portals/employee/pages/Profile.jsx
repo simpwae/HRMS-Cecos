@@ -14,7 +14,7 @@ import EmployeeRequestForm from './EmployeeRequestForm';
 export default function Profile() {
   // Get real user and employee data from stores
   const user = useAuthStore((s) => s.user);
-  const { employees, updateEmployee } = useDataStore();
+  const { employees, submitProfileUpdateRequest } = useDataStore();
   const employee = useMemo(
     () => employees.find((e) => e.id === user?.id || e.email === user?.email),
     [employees, user],
@@ -64,6 +64,7 @@ export default function Profile() {
 
   function handleDependentSubmit(e) {
     e.preventDefault();
+    if (!employee?.id) return;
     let newDependents = [...dependents];
     if (dependentEditIndex !== null) {
       newDependents[dependentEditIndex] = { ...dependentForm };
@@ -71,16 +72,31 @@ export default function Profile() {
       newDependents.push({ ...dependentForm });
     }
     setDependents(newDependents);
-    updateEmployee(employee.id, { dependents: newDependents });
+    submitProfileUpdateRequest(
+      employee.id,
+      { dependents: newDependents },
+      {
+        requestedBy: employee?.name || user?.name,
+        notes: 'Dependent update',
+      },
+    );
     setShowDependentModal(false);
     setDependentEditIndex(null);
     setDependentForm({ name: '', relationship: '', dob: '', cnic: '', document: '' });
   }
 
   function handleRemoveDependent(idx) {
+    if (!employee?.id) return;
     const newDependents = dependents.filter((_, i) => i !== idx);
     setDependents(newDependents);
-    updateEmployee(employee.id, { dependents: newDependents });
+    submitProfileUpdateRequest(
+      employee.id,
+      { dependents: newDependents },
+      {
+        requestedBy: employee?.name || user?.name,
+        notes: 'Dependent removal',
+      },
+    );
   }
   const [publications, setPublications] = useState(
     employee?.publications && employee.publications.length > 0
@@ -157,6 +173,7 @@ export default function Profile() {
 
   function handlePublicationSubmit(e) {
     e.preventDefault();
+    if (!employee?.id) return;
     let newPublications = [...publications];
     if (publicationEditIndex !== null) {
       newPublications[publicationEditIndex] = { ...publicationForm };
@@ -164,16 +181,31 @@ export default function Profile() {
       newPublications.push({ ...publicationForm });
     }
     setPublications(newPublications);
-    updateEmployee(employee.id, { publications: newPublications });
+    submitProfileUpdateRequest(
+      employee.id,
+      { publications: newPublications },
+      {
+        requestedBy: employee?.name || user?.name,
+        notes: 'Publication update',
+      },
+    );
     setShowPublicationModal(false);
     setPublicationEditIndex(null);
     setPublicationForm({ title: '', journal: '', year: '', link: '', document: '' });
   }
 
   function handleRemovePublication(idx) {
+    if (!employee?.id) return;
     const newPublications = publications.filter((_, i) => i !== idx);
     setPublications(newPublications);
-    updateEmployee(employee.id, { publications: newPublications });
+    submitProfileUpdateRequest(
+      employee.id,
+      { publications: newPublications },
+      {
+        requestedBy: employee?.name || user?.name,
+        notes: 'Publication removal',
+      },
+    );
   }
   // Qualifications logic
   const [qualificationEditIndex, setQualificationEditIndex] = useState(null);
@@ -198,6 +230,7 @@ export default function Profile() {
 
   function handleQualificationSubmit(e) {
     e.preventDefault();
+    if (!employee?.id) return;
     let newQualifications = [...qualifications];
     if (qualificationEditIndex !== null) {
       newQualifications[qualificationEditIndex] = { ...qualificationForm };
@@ -205,7 +238,14 @@ export default function Profile() {
       newQualifications.push({ ...qualificationForm });
     }
     setQualifications(newQualifications);
-    updateEmployee(employee.id, { qualifications: newQualifications });
+    submitProfileUpdateRequest(
+      employee.id,
+      { qualifications: newQualifications },
+      {
+        requestedBy: employee?.name || user?.name,
+        notes: 'Qualification update',
+      },
+    );
     setShowQualificationModal(false);
     setQualificationEditIndex(null);
     setQualificationForm({ degree: '', institution: '', field: '', year: '', document: '' });
@@ -213,7 +253,10 @@ export default function Profile() {
 
   const onSubmit = (data) => {
     if (employee) {
-      updateEmployee(employee.id, data);
+      submitProfileUpdateRequest(employee.id, data, {
+        requestedBy: employee?.name || user?.name,
+        notes: 'Profile update',
+      });
     }
     setShowEditModal(false);
   };
@@ -577,7 +620,11 @@ export default function Profile() {
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            updateEmployee(employee.id, editForm);
+            if (!employee?.id) return;
+            submitProfileUpdateRequest(employee.id, editForm, {
+              requestedBy: employee?.name || user?.name,
+              notes: 'Profile update',
+            });
             setShowEditModal(false);
           }}
           className="space-y-4"

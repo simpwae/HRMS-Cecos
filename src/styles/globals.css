@@ -90,6 +90,15 @@ body {
   .gradient-text {
     @apply bg-clip-text text-transparent bg-linear-to-r from-[hsl(var(--color-primary))] to-[hsl(var(--color-secondary))];
   }
+
+  /* Input-with-icon utilities */
+  .input-with-icon {
+    @apply pl-10;
+  }
+
+  .input-icon {
+    @apply w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400;
+  }
 }
 
 /* Animations */
@@ -208,19 +217,68 @@ input[type='email'],
 input[type='password'],
 input[type='number'],
 input[type='date'],
+input[type='time'],
 input[type='tel'],
 input[type='url'],
 input[type='search'],
+input[type='month'],
+input[type='week'],
 select,
 textarea {
-  @apply w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900 text-sm;
-  @apply bg-white shadow-sm;
+  @apply w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900 text-sm bg-white shadow-sm;
+  @apply transition-colors duration-200;
 }
 
+/* Unified focus state */
 input:focus,
 select:focus,
 textarea:focus {
   @apply outline-none ring-2 ring-[hsl(var(--color-primary)/0.2)] border-[hsl(var(--color-primary))];
+}
+
+/* Hover state */
+input:hover,
+select:hover,
+textarea:hover {
+  @apply border-gray-400;
+}
+
+/* Placeholder styling */
+input::placeholder,
+textarea::placeholder {
+  @apply text-gray-400;
+}
+
+/* Disabled state */
+input:disabled,
+select:disabled,
+textarea:disabled {
+  @apply bg-gray-100 text-gray-400 cursor-not-allowed border-gray-200;
+}
+
+/* Error & success utility classes */
+.input-error,
+.has-error input,
+.has-error select,
+.has-error textarea {
+  @apply border-red-300 ring-2 ring-red-200;
+}
+
+.input-success,
+.has-success input,
+.has-success select,
+.has-success textarea {
+  @apply border-green-300 ring-2 ring-green-200;
+}
+
+/* Remove number input spinners for consistency */
+input[type='number']::-webkit-outer-spin-button,
+input[type='number']::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type='number'] {
+  -moz-appearance: textfield;
 }
 
 /* Table styles */

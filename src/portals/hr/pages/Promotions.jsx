@@ -8,6 +8,7 @@ import Badge from '../../../components/Badge';
 import Modal from '../../../components/Modal';
 import EmptyState from '../../../components/EmptyState';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../../components/Tabs';
+import InputWithIcon from '../../../components/InputWithIcon';
 import {
   ArrowUpIcon,
   ClockIcon,
@@ -33,6 +34,8 @@ export default function HRPromotions() {
   const [actionType, setActionType] = useState(null);
   const [reviewNotes, setReviewNotes] = useState('');
   const [meetingDate, setMeetingDate] = useState('');
+  const [effectiveDate, setEffectiveDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [newSalary, setNewSalary] = useState('');
 
   // Filter promotions
   const filteredPromotions = useMemo(() => {
@@ -66,13 +69,20 @@ export default function HRPromotions() {
     setShowActionModal(true);
     setReviewNotes('');
     setMeetingDate('');
+    setEffectiveDate(promotion.effectiveDate || format(new Date(), 'yyyy-MM-dd'));
+    setNewSalary(promotion.proposedSalary || promotion.currentSalary || promotion.salaryBase || '');
   };
 
   const handleSubmitAction = () => {
     if (!selectedPromotion) return;
 
     if (actionType === 'approve') {
-      approvePromotion(selectedPromotion.id);
+      approvePromotion(selectedPromotion.id, {
+        decidedBy: user?.name,
+        notes: reviewNotes,
+        newSalary: newSalary ? parseInt(newSalary, 10) : selectedPromotion.proposedSalary,
+        effectiveDate,
+      });
     } else if (actionType === 'reject') {
       updatePromotionStatus(selectedPromotion.id, 'Rejected', {
         type: 'hr',
@@ -146,16 +156,14 @@ export default function HRPromotions() {
         </Tabs>
 
         <div className="flex flex-col sm:flex-row gap-3">
-          <div className="relative">
-            <MagnifyingGlassIcon className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search employees..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full sm:w-64"
-            />
-          </div>
+          <InputWithIcon
+            type="text"
+            placeholder="Search employees..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full sm:w-64"
+            inputClassName="pr-4 py-2 text-sm"
+          />
           <select
             value={departmentFilter}
             onChange={(e) => setDepartmentFilter(e.target.value)}
@@ -221,6 +229,11 @@ export default function HRPromotions() {
                         <span>{promotion.currentDesignation}</span>
                         <ArrowUpIcon className="w-4 h-4" />
                         <span className="font-medium">{promotion.requestedDesignation}</span>
+                        {promotion.proposedSalary && (
+                          <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-lg">
+                            Proposed Salary: {promotion.proposedSalary.toLocaleString()}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -327,6 +340,34 @@ export default function HRPromotions() {
                 {selectedPromotion.currentDesignation} → {selectedPromotion.requestedDesignation}
               </p>
             </div>
+
+            {actionType === 'approve' && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    New Salary (PKR)
+                  </label>
+                  <input
+                    type="number"
+                    value={newSalary}
+                    onChange={(e) => setNewSalary(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    placeholder="e.g., 180000"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Effective Date
+                  </label>
+                  <input
+                    type="date"
+                    value={effectiveDate}
+                    onChange={(e) => setEffectiveDate(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+              </div>
+            )}
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Comments</label>

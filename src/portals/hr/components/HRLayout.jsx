@@ -9,11 +9,15 @@ import {
   ChartBarIcon,
   Cog6ToothIcon,
   BellIcon,
+  UserPlusIcon,
   ArrowTrendingUpIcon,
   ArrowRightOnRectangleIcon,
   AcademicCapIcon,
   ChartPieIcon,
   ShieldCheckIcon,
+  BanknotesIcon,
+  IdentificationIcon,
+  CurrencyDollarIcon,
 } from '@heroicons/react/24/outline';
 
 const allNavItems = [
@@ -25,12 +29,24 @@ const allNavItems = [
     roles: ['hr', 'admin', 'dean', 'hod'],
   },
   { path: '/hr/employees', label: 'Employees', icon: UsersIcon, roles: ['hr', 'admin'] },
-  { path: '/hr/attendance', label: 'Attendance', icon: ClockIcon, roles: ['hr', 'admin'] },
+  { path: '/hr/attendance', label: 'Attendance Mgmt', icon: ClockIcon, roles: ['hr', 'admin'] },
   {
-    path: '/hr/leaves',
-    label: 'Leave Requests',
+    path: '/hr/attendance-list',
+    label: 'Attendance List',
     icon: DocumentTextIcon,
-    roles: ['hr', 'admin', 'dean', 'hod'],
+    roles: ['hr', 'admin'],
+  },
+  {
+    path: '/hr/recruitment',
+    label: 'Recruitment & ATS',
+    icon: UserPlusIcon,
+    roles: ['hr', 'admin'],
+  },
+  {
+    path: '/hr/operational',
+    label: 'Operational Dashboard',
+    icon: ChartBarIcon,
+    roles: ['hr', 'admin'],
   },
   {
     path: '/hr/promotions',
@@ -39,9 +55,27 @@ const allNavItems = [
     roles: ['hr', 'admin'],
   },
   {
+    path: '/hr/increments',
+    label: 'Bulk Increments',
+    icon: BanknotesIcon,
+    roles: ['hr', 'admin'],
+  },
+  {
+    path: '/hr/payroll',
+    label: 'Payroll',
+    icon: CurrencyDollarIcon,
+    roles: ['hr', 'admin'],
+  },
+  {
     path: '/hr/resignations',
     label: 'Resignations',
     icon: ArrowRightOnRectangleIcon,
+    roles: ['hr', 'admin'],
+  },
+  {
+    path: '/hr/profile-requests',
+    label: 'Profile Requests',
+    icon: IdentificationIcon,
     roles: ['hr', 'admin'],
   },
   {

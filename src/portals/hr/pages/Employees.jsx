@@ -9,6 +9,7 @@ import {
   sendNewEmployeeNotification,
 } from '../../../state/data';
 import { useAuthStore } from '../../../state/auth';
+import InputWithIcon from '../../../components/InputWithIcon';
 import Card from '../../../components/Card';
 import Badge from '../../../components/Badge';
 import Button from '../../../components/Button';
@@ -30,13 +31,21 @@ import {
 
 export default function Employees() {
   const user = useAuthStore((s) => s.user);
-  const { employees, addEmployee, updateEmployee, removeEmployee } = useDataStore();
+  const {
+    employees,
+    addEmployee,
+    updateEmployee,
+    removeEmployee,
+    addLifecycleEntry,
+    renewContract,
+  } = useDataStore();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [viewEmployee, setViewEmployee] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterDepartment, setFilterDepartment] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [renewalDate, setRenewalDate] = useState(format(new Date(), 'yyyy-MM-dd'));
 
   const {
     register,
@@ -205,14 +214,14 @@ export default function Employees() {
       <Card>
         <div className="flex flex-col md:flex-row gap-4">
           {/* Search */}
-          <div className="flex-1 relative">
-            <MagnifyingGlassIcon className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
+          <div className="flex-1">
+            <InputWithIcon
               type="text"
               placeholder="Search by name, code, or email..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+              className="w-full"
+              inputClassName="pr-4 py-2"
             />
           </div>
 
@@ -715,6 +724,113 @@ export default function Employees() {
                 </div>
               </div>
             )}
+
+            {viewEmployee.salaryHistory && viewEmployee.salaryHistory.length > 0 && (
+              <div className="space-y-3">
+                <p className="text-sm font-medium text-gray-700">Salary History</p>
+                <div className="max-h-60 overflow-y-auto divide-y border rounded-lg">
+                  {viewEmployee.salaryHistory
+                    .slice()
+                    .reverse()
+                    .map((entry) => (
+                      <div
+                        key={entry.id}
+                        className="flex items-center justify-between px-3 py-2 text-sm"
+                      >
+                        <div>
+                          <p className="font-medium text-gray-900">
+                            {formatCurrency(entry.amount)}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {entry.type} • {entry.reason}
+                          </p>
+                        </div>
+                        <p className="text-xs text-gray-500">
+                          {entry.effectiveDate
+                            ? format(parseISO(entry.effectiveDate), 'MMM d, yyyy')
+                            : 'N/A'}
+                        </p>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
+
+            {viewEmployee.lifecycle && viewEmployee.lifecycle.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-gray-700">Lifecycle</p>
+                <div className="space-y-2 max-h-60 overflow-y-auto">
+                  {viewEmployee.lifecycle
+                    .slice()
+                    .reverse()
+                    .map((item) => (
+                      <div key={item.id} className="p-3 rounded-lg bg-gray-50 border">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="font-semibold text-gray-900 capitalize">
+                            {item.title}
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            {item.effectiveDate
+                              ? format(parseISO(item.effectiveDate), 'MMM d, yyyy')
+                              : item.createdAt}
+                          </span>
+                        </div>
+                        {item.meta && (
+                          <p className="text-xs text-gray-600 mt-1">
+                            {Object.entries(item.meta)
+                              .map(([k, v]) => `${k}: ${v}`)
+                              .join(' • ')}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-3 pt-2 border-t">
+              {viewEmployee.employmentStatus === 'probation' && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    addLifecycleEntry(viewEmployee.id, {
+                      type: 'confirmation',
+                      title: 'Confirmation',
+                      meta: { from: 'probation', to: 'confirmed' },
+                    });
+                    updateEmployee(viewEmployee.id, { employmentStatus: 'confirmed' });
+                  }}
+                >
+                  Mark Confirmed
+                </Button>
+              )}
+
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                <div className="flex items-center gap-2 text-sm text-gray-700">
+                  <span>Contract renewal</span>
+                  <input
+                    type="date"
+                    value={renewalDate}
+                    onChange={(e) => setRenewalDate(e.target.value)}
+                    className="rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-sm"
+                  />
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() =>
+                    renewContract(viewEmployee.id, {
+                      newEndDate: renewalDate,
+                      effectiveDate: renewalDate,
+                      status: 'active',
+                    })
+                  }
+                >
+                  Renew
+                </Button>
+              </div>
+            </div>
 
             <div className="flex justify-end gap-3 pt-4 border-t">
               <Button variant="outline" onClick={() => setViewEmployee(null)}>

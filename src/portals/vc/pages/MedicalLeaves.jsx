@@ -15,6 +15,7 @@ import {
   ClockIcon,
   FunnelIcon,
 } from '@heroicons/react/24/outline';
+import InputWithIcon from '../../../components/InputWithIcon';
 import { format, parseISO, differenceInDays } from 'date-fns';
 
 const TABS = [
@@ -118,7 +119,7 @@ export default function MedicalLeaves() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <Card className="bg-gradient-to-r from-indigo-600 to-blue-600 text-white border-0">
+      <Card className="bg-linear-to-r from-indigo-600 to-blue-600 text-white border-0">
         <div className="flex items-center gap-4">
           <div className="w-14 h-14 rounded-xl bg-white/20 flex items-center justify-center">
             <DocumentIcon className="w-8 h-8" />
@@ -210,13 +211,14 @@ export default function MedicalLeaves() {
       {/* Search & Filter */}
       <Card>
         <div className="flex flex-col sm:flex-row gap-4">
-          <div className="relative flex-1">
-            <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-            <input
+          <div className="flex-1">
+            <InputWithIcon
+              type="text"
+              placeholder="Search by employee name or code..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search by employee name or code..."
-              className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-gray-200 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 outline-none"
+              className="w-full"
+              inputClassName="pr-4 py-2.5"
             />
           </div>
           <Button variant="outline" className="gap-2">
@@ -245,12 +247,12 @@ export default function MedicalLeaves() {
               return (
                 <div
                   key={leave.id}
-                  className="p-5 border border-gray-200 rounded-xl bg-gradient-to-r from-white to-gray-50 hover:shadow-md transition-all"
+                  className="p-5 border border-gray-200 rounded-xl bg-linear-to-r from-white to-gray-50 hover:shadow-md transition-all"
                 >
                   <div className="flex flex-col lg:flex-row lg:items-center gap-4">
                     {/* Employee Info */}
                     <div className="flex items-center gap-3 flex-1">
-                      <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-indigo-600 to-blue-600 text-white font-bold text-xl flex items-center justify-center shadow-md">
+                      <div className="w-14 h-14 rounded-xl bg-linear-to-br from-indigo-600 to-blue-600 text-white font-bold text-xl flex items-center justify-center shadow-md">
                         {leave.employee?.name?.charAt(0) || '?'}
                       </div>
                       <div className="min-w-0">
@@ -397,7 +399,7 @@ export default function MedicalLeaves() {
         {selectedLeave && (
           <div className="space-y-4">
             {/* Employee Info */}
-            <div className="p-4 bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-200 rounded-xl">
+            <div className="p-4 bg-linear-to-r from-indigo-50 to-blue-50 border border-indigo-200 rounded-xl">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-lg bg-indigo-600 text-white font-bold text-lg flex items-center justify-center">
                   {selectedLeave.employee?.name?.charAt(0) || '?'}

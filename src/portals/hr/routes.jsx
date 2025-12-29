@@ -14,6 +14,12 @@ import Resignations from './pages/Resignations';
 import ExEmployees from './pages/ExEmployees';
 import Analytics from './pages/Analytics';
 import PolicyAdvisory from './pages/PolicyAdvisory';
+import BulkIncrements from './pages/BulkIncrements';
+import ProfileRequests from './pages/ProfileRequests';
+import Payroll from './pages/Payroll';
+import Attendance from './pages/Attendance';
+import Recruitment from './pages/Recruitment';
+import Operational from './pages/Operational';
 
 export const hrRoutes = (
   <Route
@@ -26,11 +32,17 @@ export const hrRoutes = (
   >
     <Route index element={<HRDashboard />} />
     <Route path="employees" element={<Employees />} />
-    <Route path="attendance" element={<AttendanceList />} />
+    <Route path="attendance" element={<Attendance />} />
+    <Route path="attendance-list" element={<AttendanceList />} />
     <Route path="leaves" element={<LeavesList />} />
     <Route path="promotions" element={<Promotions />} />
+    <Route path="increments" element={<BulkIncrements />} />
+    <Route path="payroll" element={<Payroll />} />
+    <Route path="recruitment" element={<Recruitment />} />
+    <Route path="operational" element={<Operational />} />
     <Route path="resignations" element={<Resignations />} />
     <Route path="ex-employees" element={<ExEmployees />} />
+    <Route path="profile-requests" element={<ProfileRequests />} />
     <Route path="analytics" element={<Analytics />} />
     <Route path="reports" element={<Reports />} />
     <Route path="policy-advisory" element={<PolicyAdvisory />} />

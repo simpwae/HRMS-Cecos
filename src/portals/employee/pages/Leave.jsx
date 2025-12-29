@@ -4,6 +4,7 @@ import { format, differenceInDays, parseISO, addDays } from 'date-fns';
 import {
   useDataStore,
   leaveTypes,
+  specialLeaveTypes,
   validateMaternityEligibility,
   validateAdvanceNotice,
   sendLeaveNotification,
@@ -30,7 +31,7 @@ import {
 
 export default function Leave() {
   const user = useAuthStore((s) => s.user);
-  const { employees, leaves, addLeave } = useDataStore();
+  const { employees, leaves, addLeave, getLeaveRecommendations } = useDataStore();
 
   const employee = useMemo(
     () => employees.find((e) => e.id === user?.id || e.email === user?.email),
@@ -112,6 +113,18 @@ export default function Leave() {
   }, [employee]);
 
   const canApplyMaternity = maternityEligibility.eligible;
+
+  // Get leave recommendations
+  const leaveRecommendation = useMemo(() => {
+    if (!startDate || !endDate) return null;
+    return getLeaveRecommendations({
+      employeeId,
+      type: selectedType,
+      startDate,
+      endDate,
+      days: calculatedDays,
+    });
+  }, [startDate, endDate, selectedType, calculatedDays, employeeId, getLeaveRecommendations]);
 
   // My leaves
   const myLeaves = useMemo(
@@ -437,21 +450,31 @@ export default function Leave() {
               {...register('type', { required: 'Please select a leave type' })}
               className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
             >
-              {leaveTypes.map((lt) => {
-                // Hide maternity leave from non-female employees, disable for ineligible females
-                const isMaternitityLeave = lt.id === 'maternity';
-                const isHidden = isMaternitityLeave && employee?.gender?.toLowerCase() !== 'female';
-                const isDisabled = isMaternitityLeave && !canApplyMaternity;
+              <optgroup label="Regular Leaves">
+                {leaveTypes.map((lt) => {
+                  // Hide maternity leave from non-female employees, disable for ineligible females
+                  const isMaternitityLeave = lt.id === 'maternity';
+                  const isHidden =
+                    isMaternitityLeave && employee?.gender?.toLowerCase() !== 'female';
+                  const isDisabled = isMaternitityLeave && !canApplyMaternity;
 
-                if (isHidden) return null;
+                  if (isHidden) return null;
 
-                return (
-                  <option key={lt.id} value={lt.id} disabled={isDisabled}>
-                    {lt.name} ({leaveBalance[lt.id] || 0} days available)
-                    {isDisabled ? ' - Not eligible' : ''}
+                  return (
+                    <option key={lt.id} value={lt.id} disabled={isDisabled}>
+                      {lt.name} ({leaveBalance[lt.id] || 0} days available)
+                      {isDisabled ? ' - Not eligible' : ''}
+                    </option>
+                  );
+                })}
+              </optgroup>
+              <optgroup label="Special Leaves">
+                {specialLeaveTypes.map((sl) => (
+                  <option key={sl.id} value={sl.id}>
+                    {sl.name} ({sl.days} days)
                   </option>
-                );
-              })}
+                ))}
+              </optgroup>
             </select>
             {errors.type && <p className="text-sm text-red-600 mt-1">{errors.type.message}</p>}
           </div>
@@ -507,6 +530,38 @@ export default function Leave() {
                   Insufficient leave balance
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Leave Recommendations */}
+          {leaveRecommendation && (
+            <div
+              className={`p-3 rounded-lg border flex gap-3 ${
+                leaveRecommendation.recommended
+                  ? 'bg-green-50 border-green-200'
+                  : 'bg-yellow-50 border-yellow-200'
+              }`}
+            >
+              <InformationCircleIcon
+                className={`w-5 h-5 shrink-0 mt-0.5 ${
+                  leaveRecommendation.recommended ? 'text-green-600' : 'text-yellow-600'
+                }`}
+              />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-gray-900">
+                  {leaveRecommendation.recommendation}
+                </p>
+                {leaveRecommendation.details && leaveRecommendation.details.length > 0 && (
+                  <ul className="text-xs text-gray-600 mt-2 space-y-1">
+                    {leaveRecommendation.details.map((detail, idx) => (
+                      <li key={idx} className="flex items-start gap-1">
+                        <span className="shrink-0">•</span>
+                        <span>{detail}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             </div>
           )}
 

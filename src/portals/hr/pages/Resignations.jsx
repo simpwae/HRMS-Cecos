@@ -8,6 +8,7 @@ import Badge from '../../../components/Badge';
 import Modal from '../../../components/Modal';
 import EmptyState from '../../../components/EmptyState';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../../components/Tabs';
+import InputWithIcon from '../../../components/InputWithIcon';
 import {
   ArrowRightOnRectangleIcon,
   ClockIcon,
@@ -161,16 +162,14 @@ export default function HRResignations() {
         </Tabs>
 
         <div className="flex flex-col sm:flex-row gap-3">
-          <div className="relative">
-            <MagnifyingGlassIcon className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search employees..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full sm:w-64"
-            />
-          </div>
+          <InputWithIcon
+            type="text"
+            placeholder="Search employees..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full sm:w-64"
+            inputClassName="pr-4 py-2 text-sm"
+          />
           <select
             value={departmentFilter}
             onChange={(e) => setDepartmentFilter(e.target.value)}

@@ -40,6 +40,7 @@ const COLORS = [
 
 export default function Analytics() {
   const { employees, exEmployees, resignations, promotions } = useDataStore();
+  const getPerformanceAnalytics = useDataStore((s) => s.getPerformanceAnalytics);
   const [timeRange, setTimeRange] = useState('12'); // months
 
   // Current workforce stats
@@ -171,6 +172,8 @@ export default function Analytics() {
 
     return { totalHired, totalLeft, netChange };
   }, [monthlyData]);
+
+  const perf = useMemo(() => getPerformanceAnalytics(), [getPerformanceAnalytics]);
 
   return (
     <div className="space-y-6">
@@ -452,6 +455,62 @@ export default function Analytics() {
               </Bar>
             </BarChart>
           </ResponsiveContainer>
+        </div>
+      </Card>
+
+      {/* Performance Analytics */}
+      <Card title="Performance Analytics (PAMS)" subtitle="Average ratings and top performers">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div>
+            <h3 className="font-semibold text-gray-900 mb-3">Average Rating by Department</h3>
+            {perf.avgByDepartment.length === 0 ? (
+              <div className="text-sm text-gray-500">No performance reviews available.</div>
+            ) : (
+              <div className="space-y-3">
+                {perf.avgByDepartment.map((row) => (
+                  <div key={row.department} className="flex items-center justify-between">
+                    <span className="text-gray-600">{row.department}</span>
+                    <div className="flex items-center gap-2">
+                      <div className="w-24 h-2 bg-gray-100 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-emerald-500 rounded-full"
+                          style={{ width: `${(row.averageRating / 5) * 100}%` }}
+                        />
+                      </div>
+                      <span className="font-medium w-12 text-right">{row.averageRating}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div>
+            <h3 className="font-semibold text-gray-900 mb-3">Top Performers</h3>
+            {perf.topPerformers.length === 0 ? (
+              <div className="text-sm text-gray-500">No performance reviews available.</div>
+            ) : (
+              <div className="space-y-2">
+                {perf.topPerformers.map((p) => (
+                  <div
+                    key={p.employeeId}
+                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                  >
+                    <div>
+                      <p className="font-medium text-gray-900">{p.name}</p>
+                      <p className="text-xs text-gray-500">{p.department}</p>
+                    </div>
+                    <span className="text-sm font-semibold text-emerald-700">{p.rating}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="mt-4 text-sm text-gray-600">
+          Overall Average Rating:{' '}
+          <span className="font-semibold text-gray-900">{perf.overallAvg}</span> ({perf.count}{' '}
+          reviews)
         </div>
       </Card>
 

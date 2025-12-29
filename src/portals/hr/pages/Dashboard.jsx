@@ -24,6 +24,10 @@ export default function HRDashboard() {
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
   const { employees, attendance, leaves } = useDataStore();
+  const getOvertimeStats = useDataStore((s) => s.getOvertimeStats);
+  const getPendingApprovalsSummary = useDataStore((s) => s.getPendingApprovalsSummary);
+  const getExpiringContracts = useDataStore((s) => s.getExpiringContracts);
+  const payrollSettings = useDataStore((s) => s.payrollSettings);
   const userRole = user?.primaryRole || user?.role;
   const isDean = userRole === 'dean';
   const isHOD = userRole === 'hod';
@@ -79,8 +83,21 @@ export default function HRDashboard() {
         employees.length > 0
           ? Math.round(((presentToday + lateToday) / employees.length) * 100)
           : 0,
+      overtimeThisMonth: getOvertimeStats()?.totalHours || 0,
+      pendingApprovals: getPendingApprovalsSummary(),
+      expiringSoon: getExpiringContracts(
+        payrollSettings?.operationalConfig?.expiryHorizonDays || 30,
+      ),
     };
-  }, [employees, attendance, leaves]);
+  }, [
+    employees,
+    attendance,
+    leaves,
+    getOvertimeStats,
+    getPendingApprovalsSummary,
+    getExpiringContracts,
+    payrollSettings,
+  ]);
 
   // Recent leave requests - filtered by role
   const recentLeaveRequests = useMemo(() => {
@@ -183,13 +200,49 @@ export default function HRDashboard() {
             icon={CurrencyDollarIcon}
             color="success"
           />
+          <StatCard
+            title="Overtime (Month)"
+            value={`${stats.overtimeThisMonth.toFixed ? stats.overtimeThisMonth.toFixed(1) : stats.overtimeThisMonth} hrs`}
+            subtitle={`Warning above ${payrollSettings?.operationalConfig?.overtimeWarningHours || 40} hrs`}
+            icon={ClockIcon}
+            color={
+              stats.overtimeThisMonth >
+              (payrollSettings?.operationalConfig?.overtimeWarningHours || 40)
+                ? 'warning'
+                : 'default'
+            }
+          />
+          <StatCard
+            title="Pending Approvals"
+            value={
+              (stats.pendingApprovals?.leaves || 0) +
+              (stats.pendingApprovals?.attendanceCorrections || 0) +
+              (stats.pendingApprovals?.promotions || 0) +
+              (stats.pendingApprovals?.profileUpdates || 0) +
+              (stats.pendingApprovals?.selectionBoard || 0)
+            }
+            subtitle="Leaves, corrections, promotions, profiles, board"
+            icon={DocumentTextIcon}
+            color={(stats.pendingApprovals?.leaves || 0) > 5 ? 'warning' : 'default'}
+          />
+          <StatCard
+            title={`Expiries (${payrollSettings?.operationalConfig?.expiryHorizonDays || 30}d)`}
+            value={stats.expiringSoon?.length || 0}
+            subtitle="Probation & contracts due"
+            icon={CalendarIcon}
+            color={(stats.expiringSoon?.length || 0) > 0 ? 'warning' : 'default'}
+          />
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <StatCard
             title="Pending Approvals"
-            value={recentLeaveRequests.length}
-            subtitle={`Leave requests awaiting your approval`}
+            value={
+              (stats.pendingApprovals?.leaves || 0) +
+              (stats.pendingApprovals?.attendanceCorrections || 0) +
+              (stats.pendingApprovals?.promotions || 0)
+            }
+            subtitle={`Requests awaiting your approval`}
             icon={DocumentTextIcon}
             color={recentLeaveRequests.length > 5 ? 'warning' : 'default'}
           />
@@ -353,6 +406,46 @@ export default function HRDashboard() {
                     <Badge variant={issue.status === 'Late' ? 'warning' : 'error'}>
                       {issue.status}
                     </Badge>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+        )}
+
+        {/* Upcoming Expiries */}
+        {!isApprover && (
+          <Card>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-gray-900">
+                {`Upcoming Probation/Contract Expiries (${payrollSettings?.operationalConfig?.expiryHorizonDays || 30}d)`}
+              </h3>
+              <Link
+                to="/hr/employees"
+                className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1"
+              >
+                Manage <ArrowRightIcon className="w-4 h-4" />
+              </Link>
+            </div>
+            {!stats.expiringSoon || stats.expiringSoon.length === 0 ? (
+              <div className="text-center py-8">
+                <CheckCircleIcon className="w-12 h-12 text-green-300 mx-auto mb-2" />
+                <p className="text-gray-500">No upcoming expiries</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {stats.expiringSoon.map((x) => (
+                  <div
+                    key={`${x.id}-${x.dueDate}`}
+                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                  >
+                    <div>
+                      <p className="font-medium text-gray-900">{x.name}</p>
+                      <p className="text-xs text-gray-500">
+                        {x.department} • {x.type}
+                      </p>
+                    </div>
+                    <Badge variant="warning">{format(parseISO(x.dueDate), 'MMM d, yyyy')}</Badge>
                   </div>
                 ))}
               </div>

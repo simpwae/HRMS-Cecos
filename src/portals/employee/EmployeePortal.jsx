@@ -9,6 +9,7 @@ import Profile from './pages/Profile';
 import Promotions from './pages/Promotions';
 import Resignation from './pages/Resignation';
 import PolicyAdvisory from './pages/PolicyAdvisory';
+import SelfService from './pages/SelfService';
 
 export default function EmployeePortal() {
   return (
@@ -18,6 +19,7 @@ export default function EmployeePortal() {
         <Route path="attendance" element={<Attendance />} />
         <Route path="leave" element={<Leave />} />
         <Route path="salary" element={<Salary />} />
+        <Route path="self-service" element={<SelfService />} />
         <Route path="profile" element={<Profile />} />
         <Route path="promotions" element={<Promotions />} />
         <Route path="resignation" element={<Resignation />} />

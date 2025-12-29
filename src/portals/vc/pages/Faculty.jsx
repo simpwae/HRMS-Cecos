@@ -9,6 +9,7 @@ import {
   MagnifyingGlassIcon,
   BuildingOfficeIcon,
 } from '@heroicons/react/24/outline';
+import InputWithIcon from '../../../components/InputWithIcon';
 
 export default function Faculty() {
   const { employees } = useDataStore();
@@ -99,13 +100,14 @@ export default function Faculty() {
 
       <Card>
         <div className="flex flex-col sm:flex-row gap-3 mb-6">
-          <div className="flex-1 relative">
-            <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-            <input
+          <div className="flex-1">
+            <InputWithIcon
+              type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Search employees..."
-              className="w-full pl-10 pr-3 py-2.5 rounded-lg border border-gray-200 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 outline-none"
+              className="w-full"
+              inputClassName="pr-3 py-2.5"
             />
           </div>
           <select
